@@ -300,7 +300,7 @@ function renderTabelaGeral(resetPage = false) {
     filteredList = processosData.filter(p => {
         let match = true;
         if(fCtm && !(p.ctm || '').toLowerCase().includes(fCtm)) match = false;
-        if(fProc && !(p['Nº PROC.'] || '').toLowerCase().includes(fProc)) match = false;
+        if(fProc && !(p['Nº PROC'] || '').toLowerCase().includes(fProc)) match = false;
         if(fFunc && p['funcionários'] !== fFunc) match = false;
         if(fAss && p.assunto !== fAss) match = false;
         return match;
@@ -338,13 +338,13 @@ function renderPaginaAtual() {
         
         if(currentMode === 'edicao') {
             tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p['funcionários']||''}</td>
                   <td><button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button></td>`;
         } else if (currentMode === 'pesquisa') {
              tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p.entrada||''}</td>
                   <td>${dias}</td>
@@ -357,7 +357,7 @@ function renderPaginaAtual() {
                 <button class="btn btn--error btn--sm" style="background:red; color:white; border:none;" onclick="deletarProcesso('${p.id}')">Excluir</button>`;
             
             tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p.entrada||''}</td>
                   <td>${dias}</td>
@@ -399,7 +399,7 @@ window.abrirEdicao = function(id) {
     body.innerHTML = `
         <div class="filters-row">
             <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${p.ctm||''}"></div>
-            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC.']||'')}"></div>
+            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC']||'')}"></div>
             <div class="form-group"><label>Assunto</label><select id="edit-assunto" class="form-control"><option value="">Selecione...</option>${selAssuntos}</select></div>
             <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${p.entrada||''}"></div>
             <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
@@ -424,7 +424,7 @@ window.abrirEdicao = function(id) {
         
         await update(ref(db, 'processos/' + id), {
             "ctm": document.getElementById('edit-ctm').value,
-            "Nº PROC.": formatProcessoParaDB(document.getElementById('edit-proc').value),
+            "Nº PROC": formatProcessoParaDB(document.getElementById('edit-proc').value),
             "assunto": document.getElementById('edit-assunto').value,
             "entrada": document.getElementById('edit-entrada').value,
             "funcionários": document.getElementById('edit-func').value,
@@ -466,7 +466,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
     const res = processosData.filter(p => {
         let match = false;
         if(fCtm && (p.ctm || '').toLowerCase().includes(fCtm)) match = true;
-        if(fProc && (p['Nº PROC.'] || '').toLowerCase().includes(fProc)) match = true;
+        if(fProc && (p['Nº PROC'] || '').toLowerCase().includes(fProc)) match = true;
         return match;
     });
 
@@ -477,7 +477,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
 
     tbody.innerHTML = res.map(p => `<tr>
         <td>${p.ctm||''}</td>
-        <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+        <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
         <td>${p.assunto||''}</td>
         <td>${p.entrada||''}</td>
         <td>${p['funcionários']||''}</td>
