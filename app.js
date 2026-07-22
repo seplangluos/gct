@@ -63,6 +63,11 @@ function calcularDias(dataEntradaStr) {
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
+// Limpa pontos, traços e espaços do CTM para facilitar a pesquisa
+function normalizeCTM(ctm) {
+    return ctm ? ctm.toString().replace(/[\.\-\/\s]/g, '').toLowerCase() : '';
+}
+
 // =========================================================================
 // NAVEGAÇÃO
 // =========================================================================
@@ -137,9 +142,9 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-// Chama o carregamento de dados independentemente de estar logado ou não
-// Isso garante que a Consulta Pública funcione imediatamente
+// Força o carregamento dos dados para permitir a consulta pública
 loadData();
+
 // =========================================================================
 // CARREGAMENTO DE DADOS (REALTIME) - DIRETO DA RAIZ
 // =========================================================================
@@ -257,7 +262,7 @@ window.removerConfigItem = async function(chave, index) {
 }
 
 // =========================================================================
-// TELA DE CADASTRO (Mapeamento EXATO do JSON fornecido)
+// TELA DE CADASTRO 
 // =========================================================================
 document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -325,7 +330,7 @@ document.getElementById('btn-filtrar-geral').addEventListener('click', () => {
 function renderTabelaGeral(resetPage = false) {
     if(resetPage) currentPage = 1;
 
-    const fCtm = document.getElementById('filtro-ctm').value.toLowerCase().trim();
+    const fCtm = normalizeCTM(document.getElementById('filtro-ctm').value);
     const fProc = formatProcessoParaDB(document.getElementById('filtro-proc').value).toLowerCase().trim();
     const fFunc = document.getElementById('filtro-func').value;
     const fAss = document.getElementById('filtro-assunto').value;
@@ -333,7 +338,7 @@ function renderTabelaGeral(resetPage = false) {
     filteredList = processosData.filter(p => {
         let match = true;
         
-        const pCtm = (p.ctm || '').toString().toLowerCase();
+        const pCtm = normalizeCTM(p.ctm);
         const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
 
         if(fCtm && !pCtm.includes(fCtm)) match = false;
@@ -493,7 +498,7 @@ window.deletarProcesso = async function(id) {
 // CONSULTA PÚBLICA (TELA INICIAL)
 // =========================================================================
 document.getElementById('btn-consultar-publico').addEventListener('click', () => {
-    const fCtm = document.getElementById('consulta-ctm').value.toLowerCase().trim();
+    const fCtm = normalizeCTM(document.getElementById('consulta-ctm').value);
     const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value).toLowerCase().trim();
     
     const tbody = document.getElementById('tbody-consulta-publica');
@@ -505,7 +510,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
 
     const res = processosData.filter(p => {
         let match = false;
-        const pCtm = (p.ctm || '').toString().toLowerCase();
+        const pCtm = normalizeCTM(p.ctm);
         const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
 
         if(fCtm && pCtm.includes(fCtm)) match = true;
