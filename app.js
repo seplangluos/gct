@@ -24,7 +24,7 @@ const auth = getAuth(app);
 // =========================================================================
 let configData = { Assuntos: [], Cadastradores: [], Status: ["Concluído", "Em andamento", "Parado"], Destinos: ["SAG", "GAE"] };
 let processosData = [];
-let currentMode = ''; 
+let currentMode = ''; // 'edicao', 'pesquisa', 'base'
 let charts = [];
 
 // Paginação
@@ -32,9 +32,9 @@ let currentPage = 1;
 const itemsPerPage = 50;
 let filteredList = []; 
 
-// Ordenação dinâmica das colunas (asc/desc)
+// Ordenação dinâmica
 let currentSortColumn = null;
-let currentSortDirection = 'desc'; // Padrão: mais recente primeiro
+let currentSortDirection = 'desc';
 
 // =========================================================================
 // UTILITÁRIOS E MÁSCARAS
@@ -47,13 +47,12 @@ function formatProcessoParaTela(proc) {
     return proc ? proc.toString().replace(/-/g, '/') : ''; 
 }
 
-// Converte datas para o formato DD/MM/AAAA com barra
 function formatDateBR(dateStr) {
     if (!dateStr) return '';
     let limpo = dateStr.toString().replace(/-/g, '/');
     let parts = limpo.split('/');
     if (parts.length === 3) {
-        if (parts[0].length === 4) { // Formato AAAA/MM/DD
+        if (parts[0].length === 4) {
             return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
         }
         return `${parts[0].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[2]}`;
@@ -78,14 +77,13 @@ function calcularDias(dataEntradaStr) {
     return Math.floor(Math.abs(hoje - dataEnt) / (1000 * 60 * 60 * 24));
 }
 
-// Aplica máscara ao CTM: 00.000.0000
 function maskCTM(value) {
     if (!value) return '';
     let digits = value.toString().replace(/\D/g, '');
     if (digits.length === 9) {
         return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5)}`;
     }
-    return value; // Retorna original se não tiver exatamente 9 dígitos numéricos puros
+    return value;
 }
 
 function normalizeCTM(ctm) {
@@ -347,7 +345,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 });
 
 // =========================================================================
-// TABELA GERAL (Base, Edição, Pesquisa) COM ORDENAÇÃO E FILTROS DE COLUNA
+// TABELA GERAL (Base, Edição, Pesquisa)
 // =========================================================================
 function setupTabelaGeral(modo) {
     currentMode = modo;
@@ -359,7 +357,7 @@ function setupTabelaGeral(modo) {
     document.getElementById('titulo-tabela').innerText = titulos[modo];
     
     currentPage = 1; 
-    currentSortColumn = 'entrada'; // Ordenação padrão por entrada
+    currentSortColumn = 'entrada';
     currentSortDirection = 'desc';
 
     document.getElementById('filtro-ctm').value = '';
@@ -371,8 +369,14 @@ function setupTabelaGeral(modo) {
     document.getElementById('col-filter-status').value = '';
     document.getElementById('col-filter-destino').value = '';
     document.getElementById('col-filter-datamask').value = '';
-    
-    renderTabelaGeral(true);
+
+    // Se o modo for "pesquisa", iniciamos com lista vazia para otimizar a performance
+    if (modo === 'pesquisa') {
+        filteredList = [];
+        renderPaginaAtual();
+    } else {
+        renderTabelaGeral(true);
+    }
 }
 
 document.getElementById('btn-filtrar-geral').addEventListener('click', () => renderTabelaGeral(true));
@@ -393,6 +397,13 @@ function renderTabelaGeral(resetPage = false) {
     const colStatus = document.getElementById('col-filter-status').value;
     const colDest = document.getElementById('col-filter-destino').value;
     const colDataMask = document.getElementById('col-filter-datamask').value;
+
+    // No modo pesquisa, se nenhum filtro foi preenchido, mantém a listagem vazia para economizar processamento
+    if (currentMode === 'pesquisa' && !fCtm && !fProc && !fFunc && !fAss && !colAss && !colFunc && !colStatus && !colDest && !colDataMask) {
+        filteredList = [];
+        renderPaginaAtual();
+        return;
+    }
 
     filteredList = processosData.filter(p => {
         let match = true;
@@ -415,7 +426,6 @@ function renderTabelaGeral(resetPage = false) {
         return match;
     });
 
-    // Ordenação por colunas clicáveis
     if (currentSortColumn) {
         filteredList.sort((a, b) => {
             let valA = a[currentSortColumn] || '';
@@ -487,7 +497,7 @@ function renderPaginaAtual() {
             <th onclick="ordenarColuna('dias status')" style="cursor:pointer">Dias Status${sortIndicator('dias status')}</th>
             <th onclick="ordenarColuna('destino')" style="cursor:pointer">Destino${sortIndicator('destino')}</th>
             <th>Detalhes</th>`;
-    } else { // base
+    } else {
         thead.innerHTML = `
             <th onclick="ordenarColuna('ctm')" style="cursor:pointer">CTM${sortIndicator('ctm')}</th>
             <th onclick="ordenarColuna('Nº PROC')" style="cursor:pointer">Nº Processo${sortIndicator('Nº PROC')}</th>
@@ -500,6 +510,12 @@ function renderPaginaAtual() {
             <th onclick="ordenarColuna('dias status')" style="cursor:pointer">Dias Status${sortIndicator('dias status')}</th>
             <th onclick="ordenarColuna('destino')" style="cursor:pointer">Destino${sortIndicator('destino')}</th>
             <th>Ações</th>`;
+    }
+
+    if (totalItems === 0 && currentMode === 'pesquisa') {
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center">Preencha os filtros acima e clique em "Pesquisar/Filtrar" para exibir os resultados.</td></tr>`;
+        document.getElementById('page-info').innerText = `Página 1 de 1 (Total: 0 registros)`;
+        return;
     }
 
     tbody.innerHTML = paginatedItems.map(p => {
@@ -808,7 +824,6 @@ function renderCharts(mes, ano) {
         if(isMes && p['funcionários']) {
             funcCount[p['funcionários']] = (funcCount[p['funcionários']]||0) + 1;
         }
-        // Gráfico 3: Top 6 funcionários mensais filtrados por status Concluído no mês atual
         if(isMes && p.status === 'Concluído' && p['funcionários']) {
             funcConclCount[p['funcionários']] = (funcConclCount[p['funcionários']]||0) + 1;
         }
