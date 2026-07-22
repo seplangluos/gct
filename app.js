@@ -237,7 +237,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 
     const obj = {
         "ctm": document.getElementById('cad-ctm').value,
-        "Nº PROC.": formatProcessoParaDB(document.getElementById('Nº PROC.').value),
+        "Nº PROC.": formatProcessoParaDB(document.getElementById('Nº PROC').value),
         "assunto": document.getElementById('cad-assunto').value,
         "entrada": document.getElementById('cad-entrada').value,
         "Vistoria": document.getElementById('cad-vistoria').value,
