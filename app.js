@@ -245,8 +245,8 @@ function populateDateMaskFilter() {
     let current = select.value;
     let mesesAnosSet = new Set();
     processosData.forEach(p => {
-        if (p['data status']) {
-            let dt = formatDateBR(p['data status']);
+        if (p['Data Status']) {
+            let dt = formatDateBR(p['Data Status']);
             let parts = dt.split('/');
             if (parts.length === 3) {
                 mesesAnosSet.add(`${parts[1]}/${parts[2]}`);
@@ -325,7 +325,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
         "3ª VISITA": formatDateBR(document.getElementById('cad-v3').value),
         "OBS": document.getElementById('cad-obs').value,
         "dias": diasCalculados,
-        "data status": dataStatusFmt,
+        "Data Status": DataStatusFmt,
         "dias status": dataStatusFmt ? diasStatusCalculados : "0",
         "saída": formatDateBR(document.getElementById('cad-saida').value),
         "destino": document.getElementById('cad-destino').value,
@@ -420,7 +420,7 @@ function renderTabelaGeral(resetPage = false) {
         if(colStatus && p.status !== colStatus) match = false;
         if(colDest && p.destino !== colDest) match = false;
         if(colDataMask) {
-            let dt = formatDateBR(p['data status']);
+            let dt = formatDateBR(p['Data Status']);
             if (!dt || !dt.endsWith(colDataMask)) match = false;
         }
         return match;
@@ -493,7 +493,7 @@ function renderPaginaAtual() {
             <th onclick="ordenarColuna('dias')" style="cursor:pointer">Dias${sortIndicator('dias')}</th>
             <th onclick="ordenarColuna('funcionários')" style="cursor:pointer">Funcionário${sortIndicator('funcionários')}</th>
             <th onclick="ordenarColuna('status')" style="cursor:pointer">Status${sortIndicator('status')}</th>
-            <th onclick="ordenarColuna('data status')" style="cursor:pointer">Data Status${sortIndicator('data status')}</th>
+            <th onclick="ordenarColuna('Data Status')" style="cursor:pointer">Data Status${sortIndicator('Data Status')}</th>
             <th onclick="ordenarColuna('dias status')" style="cursor:pointer">Dias Status${sortIndicator('dias status')}</th>
             <th onclick="ordenarColuna('destino')" style="cursor:pointer">Destino${sortIndicator('destino')}</th>
             <th>Detalhes</th>`;
@@ -506,7 +506,7 @@ function renderPaginaAtual() {
             <th onclick="ordenarColuna('dias')" style="cursor:pointer">Dias${sortIndicator('dias')}</th>
             <th onclick="ordenarColuna('funcionários')" style="cursor:pointer">Funcionário${sortIndicator('funcionários')}</th>
             <th onclick="ordenarColuna('status')" style="cursor:pointer">Status${sortIndicator('status')}</th>
-            <th onclick="ordenarColuna('data status')" style="cursor:pointer">Data Status${sortIndicator('data status')}</th>
+            <th onclick="ordenarColuna('Data Status')" style="cursor:pointer">Data Status${sortIndicator('Data Status')}</th>
             <th onclick="ordenarColuna('dias status')" style="cursor:pointer">Dias Status${sortIndicator('dias status')}</th>
             <th onclick="ordenarColuna('destino')" style="cursor:pointer">Destino${sortIndicator('destino')}</th>
             <th>Ações</th>`;
@@ -520,7 +520,7 @@ function renderPaginaAtual() {
 
     tbody.innerHTML = paginatedItems.map(p => {
         let dias = calcularDias(p.entrada);
-        let diasStatus = p['data status'] ? calcularDias(p['data status']) : 0;
+        let diasStatus = p['Data Status'] ? calcularDias(p['Data Status']) : 0;
         let tr = '';
         
         if(currentMode === 'edicao') {
@@ -538,7 +538,7 @@ function renderPaginaAtual() {
                   <td>${dias}</td>
                   <td>${p['funcionários']||''}</td>
                   <td>${p.status||''}</td>
-                  <td>${formatDateBR(p['data status'])||''}</td>
+                  <td>${formatDateBR(p['Data Status'])||''}</td>
                   <td>${diasStatus}</td>
                   <td>${p.destino||''}</td>
                   <td>${p['OBS']||''}</td>`;
@@ -554,7 +554,7 @@ function renderPaginaAtual() {
                   <td>${dias}</td>
                   <td>${p['funcionários']||''}</td>
                   <td>${p.status||''}</td>
-                  <td>${formatDateBR(p['data status'])||''}</td>
+                  <td>${formatDateBR(p['Data Status'])||''}</td>
                   <td>${diasStatus}</td>
                   <td>${p.destino||''}</td>
                   <td>${acoes}</td>`;
@@ -597,7 +597,7 @@ window.abrirEdicao = function(id) {
             <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${formatDateBR(p.entrada)||''}"></div>
             <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
             <div class="form-group"><label>Status</label><select id="edit-status" class="form-control"><option value="">Selecione...</option>${selStatus}</select></div>
-            <div class="form-group"><label>Data Status</label><input type="text" id="edit-data-status" class="form-control" value="${formatDateBR(p['data status'])||''}"></div>
+            <div class="form-group"><label>Data Status</label><input type="text" id="edit-data-status" class="form-control" value="${formatDateBR(p['Data Status'])||''}"></div>
             <div class="form-group"><label>Vistoria</label><input type="text" id="edit-vist" class="form-control" value="${formatDateBR(p['Vistoria'])||''}"></div>
             <div class="form-group"><label>1ª Vist</label><input type="text" id="edit-v1" class="form-control" value="${formatDateBR(p['1ª VISITA'])||''}"></div>
             <div class="form-group"><label>2ª Vist</label><input type="text" id="edit-v2" class="form-control" value="${formatDateBR(p['2ª VISITA'])||''}"></div>
@@ -628,7 +628,7 @@ window.abrirEdicao = function(id) {
             "entrada": entradaFmt,
             "funcionários": document.getElementById('edit-func').value,
             "status": document.getElementById('edit-status').value,
-            "data status": dataStatusFmt,
+            "Data Status": DataStatusFmt,
             "dias status": dataStatusFmt ? diasStatusCalculados : "0",
             "Vistoria": formatDateBR(document.getElementById('edit-vist').value),
             "1ª VISITA": formatDateBR(document.getElementById('edit-v1').value),
@@ -677,7 +677,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
 
     tbody.innerHTML = res.map(p => {
         let dias = calcularDias(p.entrada);
-        let diasStatus = p['data status'] ? calcularDias(p['data status']) : 0;
+        let diasStatus = p['Data Status'] ? calcularDias(p['Data Status']) : 0;
         return `<tr>
             <td>${maskCTM(p.ctm)||''}</td>
             <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
@@ -685,7 +685,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
             <td>${formatDateBR(p.entrada)||''}</td>
             <td>${p['funcionários']||''}</td>
             <td>${p.status||''}</td>
-            <td>${formatDateBR(p['data status'])||''}</td>
+            <td>${formatDateBR(p['Data Status'])||''}</td>
             <td>${diasStatus}</td>
             <td>${p.destino||''}</td>
             <td><div style="max-width:200px; white-space:normal; word-wrap:break-word;">${p['OBS']||''}</div></td>
