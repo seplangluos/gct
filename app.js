@@ -237,11 +237,11 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 
     const obj = {
         "ctm": document.getElementById('cad-ctm').value,
-        "Nº PROC.": formatProcessoParaDB(document.getElementById('cad-processo').value),
+        "Nº PROC.": formatProcessoParaDB(document.getElementById('Nº PROC.').value),
         "assunto": document.getElementById('cad-assunto').value,
         "entrada": document.getElementById('cad-entrada').value,
         "Vistoria": document.getElementById('cad-vistoria').value,
-        "funcionários": document.getElementById('cad-funcionario').value,
+        "funcionários": document.getElementById('cad-funcionários').value,
         "1ª VISITA": document.getElementById('cad-v1').value,
         "2ª VISITA": document.getElementById('cad-v2').value,
         "3ª VISITA": document.getElementById('cad-v3').value,
