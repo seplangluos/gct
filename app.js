@@ -106,16 +106,16 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
     e.preventDefault();
     const obj = {
         ctm: document.getElementById('cad-ctm').value,
-        processo: formatProcessoParaDB(document.getElementById('cad-processo').value),
+        processo: formatProcessoParaDB(document.getElementById('cad-Nº PROC').value),
         assunto: document.getElementById('cad-assunto').value,
         entrada: document.getElementById('cad-entrada').value,
-        funcionario: document.getElementById('cad-funcionario').value,
+        funcionario: document.getElementById('cad-funcionários').value,
         status: document.getElementById('cad-status').value,
         vistoria: document.getElementById('cad-vistoria').value,
-        v1: document.getElementById('cad-v1').value,
-        v2: document.getElementById('cad-v2').value,
-        v3: document.getElementById('cad-v3').value,
-        saida: document.getElementById('cad-saida').value,
+        v1: document.getElementById('cad-1ª VISITA').value,
+        v2: document.getElementById('cad-2ª VISITA').value,
+        v3: document.getElementById('cad-3ª VISITA').value,
+        saida: document.getElementById('cad-saída').value,
         destino: document.getElementById('cad-destino').value,
         observacao: document.getElementById('cad-obs').value
     };
