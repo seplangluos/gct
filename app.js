@@ -125,7 +125,6 @@ document.querySelectorAll('.btn-voltar-login').forEach(b => {
 
 onAuthStateChanged(auth, user => {
     if(user) { 
-        // Procura no Mapeamento qual o Nome de Usuário correspondente ao Email logado
         let nomeUsuario = user.email;
         for (const [key, value] of Object.entries(USER_MAPPING)) {
             if (value === user.email) {
@@ -133,13 +132,14 @@ onAuthStateChanged(auth, user => {
                 break;
             }
         }
-        
         document.getElementById('user-info').innerText = `Usuário: ${nomeUsuario}`; 
         nav('dashboard'); 
-        loadData(); 
     }
 });
 
+// Chama o carregamento de dados independentemente de estar logado ou não
+// Isso garante que a Consulta Pública funcione imediatamente
+loadData();
 // =========================================================================
 // CARREGAMENTO DE DADOS (REALTIME) - DIRETO DA RAIZ
 // =========================================================================
