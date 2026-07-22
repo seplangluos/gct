@@ -82,17 +82,30 @@ window.nav = function(screenId) {
 // =========================================================================
 // AUTENTICAÇÃO
 // =========================================================================
+const USER_MAPPING = {
+    "Cadastro": "seplan.cadastro@valadares.mg.gov.br",
+    "Admin": "admin@hotmail.com"
+};
+
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
+    
+    const usuario = document.getElementById('login-usuario').value;
     const pass = document.getElementById('login-password').value;
+    const email = USER_MAPPING[usuario];
+    
+    if (!email) {
+        document.getElementById('login-error').innerText = "Selecione um usuário válido.";
+        document.getElementById('login-error').classList.remove('hidden');
+        return;
+    }
     
     document.getElementById('login-btn').innerText = 'Aguarde...';
     try {
         await signInWithEmailAndPassword(auth, email, pass);
         nav('dashboard');
     } catch(err) {
-        document.getElementById('login-error').innerText = "Erro ao logar. Verifique credenciais.";
+        document.getElementById('login-error').innerText = "Erro ao logar. Verifique a senha.";
         document.getElementById('login-error').classList.remove('hidden');
     } finally {
         document.getElementById('login-btn').innerText = 'Entrar';
@@ -112,7 +125,16 @@ document.querySelectorAll('.btn-voltar-login').forEach(b => {
 
 onAuthStateChanged(auth, user => {
     if(user) { 
-        document.getElementById('user-info').innerText = user.email; 
+        // Procura no Mapeamento qual o Nome de Usuário correspondente ao Email logado
+        let nomeUsuario = user.email;
+        for (const [key, value] of Object.entries(USER_MAPPING)) {
+            if (value === user.email) {
+                nomeUsuario = key;
+                break;
+            }
+        }
+        
+        document.getElementById('user-info').innerText = `Usuário: ${nomeUsuario}`; 
         nav('dashboard'); 
         loadData(); 
     }

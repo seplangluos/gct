@@ -21,9 +21,13 @@
                             <label class="form-label">Email:</label>
                             <input type="email" id="login-email" class="form-control" required placeholder="Digite seu email">
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Senha:</label>
-                            <input type="password" id="login-password" class="form-control" required placeholder="Digite sua senha">
+<div class="form-group">
+                            <label class="form-label">Usuário:</label>
+                            <select id="login-usuario" class="form-control" required>
+                                <option value="">Selecione o usuário</option>
+                                <option value="Cadastro">Cadastro</option>
+                                <option value="Admin">Admin</option>
+                            </select>
                         </div>
                         <button type="submit" id="login-btn" class="btn btn--primary btn--full-width mt-8">Entrar</button>
                     </form>
