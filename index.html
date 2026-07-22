@@ -40,7 +40,7 @@
 
     <!-- TELA DE CONSULTA PÚBLICA -->
     <div id="consulta-screen" class="screen">
-        <div class="container mt-8">
+        <div class="container-fluid mt-8">
             <div class="card">
                 <div class="card__header flex justify-between items-center">
                     <h2>Consulta de Entradas</h2>
@@ -56,7 +56,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Funcionário</th><th>Status</th><th>Data Status</th><th>Dias Status</th><th>Destino</th><th>Detalhes</th>
+                                    <th>CTM</th><th>Nº Processo</th><th class="col-assunto">Assunto</th><th>Entrada</th><th>Funcionário</th><th>Status</th><th>Data Status</th><th>Dias Status</th><th>Destino</th><th class="col-detalhes">Detalhes</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-consulta-publica"></tbody>
@@ -123,8 +123,8 @@
 
     <!-- TELA DE TABELA GERAL (Base, Edição, Pesquisa) -->
     <div id="tabela-geral-screen" class="screen">
-        <div class="screen-header"><div class="container flex justify-between items-center"><h2 id="titulo-tabela">Base de Dados</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
-        <div class="container mt-8">
+        <div class="screen-header"><div class="container-fluid flex justify-between items-center"><h2 id="titulo-tabela">Base de Dados</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
+        <div class="container-fluid mt-8">
             <div class="card mb-8">
                 <div class="card__body flex gap-16 flex-wrap" id="filtros-container">
                     <input type="text" id="filtro-ctm" class="form-control" placeholder="CTM">
@@ -135,7 +135,6 @@
                 </div>
             </div>
             <div class="card">
-                <!-- Filtros adicionais nas colunas específicas -->
                 <div class="card__header flex gap-8 flex-wrap" style="background: var(--color-bg-1);">
                     <select id="col-filter-assunto" class="form-control dyn-assuntos" style="max-width: 200px;"><option value="">Filtrar Assunto...</option></select>
                     <select id="col-filter-func" class="form-control dyn-funcionarios" style="max-width: 200px;"><option value="">Filtrar Funcionário...</option></select>
@@ -151,7 +150,6 @@
                         <tbody id="tbody-geral"></tbody>
                     </table>
                 </div>
-                <!-- PAGINAÇÃO -->
                 <div class="card__footer flex justify-between items-center" style="padding: 16px; background: var(--color-surface); border-top: 1px solid var(--color-border);">
                     <span id="page-info" style="font-weight: 500; color: var(--color-text-secondary);">Mostrando página 1</span>
                     <div class="flex gap-8">
@@ -203,7 +201,6 @@
         </div>
         <div class="container mt-8">
             <div class="filters-row">
-                <!-- Assuntos -->
                 <div class="card">
                     <div class="card__header"><h4>Assuntos</h4></div>
                     <div class="card__body">
@@ -211,7 +208,6 @@
                         <ul id="lista-assuntos" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
                     </div>
                 </div>
-                <!-- Funcionários -->
                 <div class="card">
                     <div class="card__header"><h4>Funcionários</h4></div>
                     <div class="card__body">
@@ -219,7 +215,6 @@
                         <ul id="lista-funcionarios" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
                     </div>
                 </div>
-                <!-- Status -->
                 <div class="card">
                     <div class="card__header"><h4>Status</h4></div>
                     <div class="card__body">
@@ -227,7 +222,6 @@
                         <ul id="lista-status" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
                     </div>
                 </div>
-                <!-- Destinos -->
                 <div class="card">
                     <div class="card__header"><h4>Destinos</h4></div>
                     <div class="card__body">
