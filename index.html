@@ -118,8 +118,13 @@
 
     <!-- OUTRAS TELAS (Edição, Pesquisa, Base, Estatísticas, Config) -->
     <!-- (Para manter o nível de esforço e o código compacto, usaremos uma estrutura unificada de tabela para Base/Edição/Pesquisa, controlada via JS) -->
-    <div id="tabela-geral-screen" class="screen">
-        <div class="screen-header"><div class="container flex justify-between items-center"><h2 id="titulo-tabela">Base de Dados</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
+<div id="tabela-geral-screen" class="screen">
+        <div class="screen-header">
+            <div class="container flex justify-between items-center">
+                <h2 id="titulo-tabela">Base de Dados</h2>
+                <button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button>
+            </div>
+        </div>
         <div class="container mt-8">
             <div class="card mb-8">
                 <div class="card__body flex gap-16 flex-wrap" id="filtros-container">
@@ -127,9 +132,10 @@
                     <input type="text" id="filtro-proc" class="form-control" placeholder="Nº Processo">
                     <select id="filtro-func" class="form-control dyn-funcionarios"><option value="">Todos Funcionários</option></select>
                     <select id="filtro-assunto" class="form-control dyn-assuntos"><option value="">Todos Assuntos</option></select>
-                    <button id="btn-filtrar-geral" class="btn btn--primary">Pesquisar/Filtrar</button>
+                    <button id="btn-filtrar-geral" class="btn btn--primary">Pesquisar / Filtrar</button>
                 </div>
             </div>
+            
             <div class="card">
                 <div class="table-container">
                     <table class="data-table">
@@ -138,6 +144,14 @@
                         </thead>
                         <tbody id="tbody-geral"></tbody>
                     </table>
+                </div>
+                <!-- CONTROLES DE PAGINAÇÃO -->
+                <div class="card__footer flex justify-between items-center" style="padding: 16px; background: var(--color-surface); border-top: 1px solid var(--color-border);">
+                    <span id="page-info" style="font-weight: 500; color: var(--color-text-secondary);">Mostrando página 1</span>
+                    <div class="flex gap-8">
+                        <button id="btn-prev-page" class="btn btn--outline" onclick="mudarPagina(-1)">Anterior</button>
+                        <button id="btn-next-page" class="btn btn--outline" onclick="mudarPagina(1)">Próxima</button>
+                    </div>
                 </div>
             </div>
         </div>

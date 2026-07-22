@@ -2,6 +2,9 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { getDatabase, ref, push, set, onValue, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 
+// =========================================================================
+// CONFIGURAÇÃO FIREBASE
+// =========================================================================
 const firebaseConfig = {
     apiKey: "AIzaSyDIMziMEygrNUc3VeYxLOyj98JSMyeEkI8",
     authDomain: "cadastro-39a2b.firebaseapp.com",
@@ -16,79 +19,145 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// Estado da Aplicação
+// =========================================================================
+// VARIÁVEIS GLOBAIS
+// =========================================================================
 let configData = { Assuntos: [], Cadastradores: [], Status: ["Em andamento", "Concluído", "Parado"] };
 let processosData = [];
-let currentMode = ''; // edicao, pesquisa, base
+let currentMode = ''; // 'edicao', 'pesquisa', 'base'
+let charts = [];
 
-// Navegação
-window.nav = function(screenId) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    if(screenId === 'login' || screenId === 'consulta' || screenId === 'dashboard' || screenId === 'cadastro' || screenId === 'estatisticas') {
-        document.getElementById(screenId + '-screen').classList.add('active');
-    } else {
-        document.getElementById('tabela-geral-screen').classList.add('active');
-        setupTabelaGeral(screenId);
-    }
+// Variáveis de Paginação
+let currentPage = 1;
+const itemsPerPage = 50;
+let filteredList = []; 
+
+// =========================================================================
+// UTILITÁRIOS
+// =========================================================================
+function formatProcessoParaDB(proc) { 
+    return proc ? proc.replace(/\//g, '-') : ''; 
 }
 
-// Utilitários de Data e Processo
-function formatProcessoParaDB(proc) { return proc.replace(/\//g, '-'); }
-function formatProcessoParaTela(proc) { return proc.replace(/-/g, '/'); }
+function formatProcessoParaTela(proc) { 
+    return proc ? proc.replace(/-/g, '/') : ''; 
+}
+
 function parseDateBR(dateStr) {
     if(!dateStr) return null;
     const parts = dateStr.split('/');
     if(parts.length !== 3) return null;
     return new Date(parts[2], parts[1] - 1, parts[0]);
 }
+
 function calcularDias(dataEntradaStr) {
     const dataEnt = parseDateBR(dataEntradaStr);
     if(!dataEnt) return 0;
-    const diffTime = Math.abs(new Date() - dataEnt);
+    
+    // Zera as horas para calcular apenas os dias corridos
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    dataEnt.setHours(0, 0, 0, 0);
+
+    const diffTime = Math.abs(hoje - dataEnt);
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
-// Autenticação
+// =========================================================================
+// NAVEGAÇÃO
+// =========================================================================
+window.nav = function(screenId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    
+    if(['login', 'consulta', 'dashboard', 'cadastro', 'estatisticas', 'configuracoes'].includes(screenId)) {
+        document.getElementById(screenId + '-screen').classList.add('active');
+        if(screenId === 'configuracoes') renderConfigLists();
+        if(screenId === 'estatisticas') renderStats();
+    } else {
+        document.getElementById('tabela-geral-screen').classList.add('active');
+        setupTabelaGeral(screenId);
+    }
+}
+
+// =========================================================================
+// AUTENTICAÇÃO
+// =========================================================================
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-password').value;
+    
+    document.getElementById('login-btn').innerText = 'Aguarde...';
     try {
         await signInWithEmailAndPassword(auth, email, pass);
         nav('dashboard');
     } catch(err) {
-        alert("Erro ao logar: " + err.message);
+        document.getElementById('login-error').innerText = "Erro ao logar. Verifique credenciais.";
+        document.getElementById('login-error').classList.remove('hidden');
+    } finally {
+        document.getElementById('login-btn').innerText = 'Entrar';
     }
 });
-document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); nav('login'); });
-document.getElementById('btn-open-consulta').addEventListener('click', () => { nav('consulta'); });
-document.querySelectorAll('.btn-voltar-login').forEach(b => b.addEventListener('click', () => nav('login')));
 
-onAuthStateChanged(auth, user => {
-    if(user) { document.getElementById('user-info').innerText = user.email; nav('dashboard'); loadData(); }
+document.getElementById('btn-logout').addEventListener('click', () => { 
+    signOut(auth); 
+    nav('login'); 
 });
 
-// Carregar Dados do Firebase
+document.getElementById('btn-open-consulta').addEventListener('click', () => nav('consulta'));
+
+document.querySelectorAll('.btn-voltar-login').forEach(b => {
+    b.addEventListener('click', () => nav('login'));
+});
+
+onAuthStateChanged(auth, user => {
+    if(user) { 
+        document.getElementById('user-info').innerText = user.email; 
+        nav('dashboard'); 
+        loadData(); 
+    }
+});
+
+// =========================================================================
+// CARREGAMENTO DE DADOS (REALTIME)
+// =========================================================================
 function loadData() {
+    // Carrega as configurações (listas)
     onValue(ref(db, 'config'), snap => {
         if(snap.exists()) {
             configData = { ...configData, ...snap.val() };
             populateSelects();
+            // Se estiver na tela de config, atualiza também
+            if(document.getElementById('configuracoes-screen').classList.contains('active')){
+                renderConfigLists();
+            }
         }
     });
+
+    // Carrega os processos
     onValue(ref(db, 'processos'), snap => {
         processosData = [];
         if(snap.exists()) {
-            snap.forEach(child => { processosData.push({ id: child.key, ...child.val() }); });
+            snap.forEach(child => { 
+                processosData.push({ id: child.key, ...child.val() }); 
+            });
         }
-        if(document.getElementById('estatisticas-screen').classList.contains('active')) renderStats();
+        
+        // Atualiza a tabela se estiver visualizando alguma
+        if(document.getElementById('tabela-geral-screen').classList.contains('active')) {
+            renderTabelaGeral(false); 
+        }
+        // Atualiza estatísticas se a tela estiver aberta
+        if(document.getElementById('estatisticas-screen').classList.contains('active')) {
+            renderStats();
+        }
     });
 }
 
 function populateSelects() {
-    const arrAssuntos = configData.Assuntos || ["Alienação", "Alvará Funcionamento"];
-    const arrFuncs = configData.Cadastradores || ["Abel", "Ariadna"];
-    const arrStatus = configData.Status || ["Concluído", "Em Andamento"];
+    const arrAssuntos = configData.Assuntos || [];
+    const arrFuncs = configData.Cadastradores || [];
+    const arrStatus = configData.Status || [];
     
     document.querySelectorAll('.dyn-assuntos').forEach(sel => {
         sel.innerHTML = '<option value="">Selecione...</option>' + arrAssuntos.map(a => `<option value="${a}">${a}</option>`).join('');
@@ -101,48 +170,124 @@ function populateSelects() {
     });
 }
 
-// Salvar Cadastro
+// =========================================================================
+// CONFIGURAÇÕES (Adicionar/Remover itens das listas)
+// =========================================================================
+function renderConfigLists() {
+    const gerarHtml = (arr, chave) => {
+        return (arr || []).map((item, idx) => `
+            <li class="flex justify-between items-center" style="padding: 8px 0; border-bottom: 1px solid var(--color-border);">
+                <span>${item}</span>
+                <button class="btn btn--error btn--sm" onclick="removerConfigItem('${chave}', ${idx})" style="padding: 4px 8px; font-size: 10px; background: red; color: white; border: none;">Excluir</button>
+            </li>
+        `).join('');
+    };
+
+    document.getElementById('lista-assuntos').innerHTML = gerarHtml(configData.Assuntos, 'Assuntos');
+    document.getElementById('lista-funcionarios').innerHTML = gerarHtml(configData.Cadastradores, 'Cadastradores');
+    document.getElementById('lista-status').innerHTML = gerarHtml(configData.Status, 'Status');
+}
+
+window.addConfigItem = async function(chave, inputId) {
+    const valor = document.getElementById(inputId).value.trim();
+    if(!valor) return;
+    
+    const novaLista = [...(configData[chave] || []), valor];
+    
+    try {
+        await set(ref(db, 'config/' + chave), novaLista);
+        document.getElementById(inputId).value = '';
+    } catch(err) { 
+        alert("Erro ao salvar: " + err.message); 
+    }
+}
+
+window.removerConfigItem = async function(chave, index) {
+    if(!confirm('Tem certeza que deseja remover este item?')) return;
+    
+    const novaLista = [...(configData[chave] || [])];
+    novaLista.splice(index, 1);
+    
+    try {
+        await set(ref(db, 'config/' + chave), novaLista);
+    } catch(err) { 
+        alert("Erro ao remover: " + err.message); 
+    }
+}
+
+// =========================================================================
+// TELA DE CADASTRO
+// =========================================================================
 document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    const btnSalvar = e.target.querySelector('button[type="submit"]');
+    btnSalvar.innerText = "Salvando...";
+    btnSalvar.disabled = true;
+
     const obj = {
         ctm: document.getElementById('cad-ctm').value,
-        processo: formatProcessoParaDB(document.getElementById('cad-Nº PROC').value),
+        processo: formatProcessoParaDB(document.getElementById('cad-processo').value),
         assunto: document.getElementById('cad-assunto').value,
         entrada: document.getElementById('cad-entrada').value,
-        funcionario: document.getElementById('cad-funcionários').value,
+        funcionario: document.getElementById('cad-funcionario').value,
         status: document.getElementById('cad-status').value,
         vistoria: document.getElementById('cad-vistoria').value,
-        v1: document.getElementById('cad-1ª VISITA').value,
-        v2: document.getElementById('cad-2ª VISITA').value,
-        v3: document.getElementById('cad-3ª VISITA').value,
-        saida: document.getElementById('cad-saída').value,
+        v1: document.getElementById('cad-v1').value,
+        v2: document.getElementById('cad-v2').value,
+        v3: document.getElementById('cad-v3').value,
+        saida: document.getElementById('cad-saida').value,
         destino: document.getElementById('cad-destino').value,
         observacao: document.getElementById('cad-obs').value
     };
+
     try {
         await push(ref(db, 'processos'), obj);
-        alert('Salvo com sucesso!');
+        alert('Cadastro realizado com sucesso!');
         e.target.reset();
-    } catch(err) { alert("Erro: " + err.message); }
+    } catch(err) { 
+        alert("Erro ao salvar: " + err.message); 
+    } finally {
+        btnSalvar.innerText = "Salvar Nova Entrada";
+        btnSalvar.disabled = false;
+    }
 });
 
-// Setup Tabelas Múltiplas (Base, Edição, Pesquisa)
+// =========================================================================
+// PAGINAÇÃO E TABELA GERAL (Base, Edição, Pesquisa)
+// =========================================================================
 function setupTabelaGeral(modo) {
     currentMode = modo;
-    const titulos = { 'edicao': 'Edição de Processos', 'pesquisa': 'Pesquisar Processos', 'base': 'Base de Dados' };
+    const titulos = { 
+        'edicao': 'Edição de Processos', 
+        'pesquisa': 'Pesquisar Processos', 
+        'base': 'Base de Dados Completa' 
+    };
     document.getElementById('titulo-tabela').innerText = titulos[modo];
-    renderTabelaGeral();
+    
+    // Reseta paginação e filtros ao abrir a tela
+    currentPage = 1; 
+    document.getElementById('filtro-ctm').value = '';
+    document.getElementById('filtro-proc').value = '';
+    document.getElementById('filtro-func').value = '';
+    document.getElementById('filtro-assunto').value = '';
+    
+    renderTabelaGeral(true);
 }
 
-document.getElementById('btn-filtrar-geral').addEventListener('click', renderTabelaGeral);
+document.getElementById('btn-filtrar-geral').addEventListener('click', () => {
+    renderTabelaGeral(true); // Se clicar em filtrar, volta pra pág 1
+});
 
-function renderTabelaGeral() {
+function renderTabelaGeral(resetPage = false) {
+    if(resetPage) currentPage = 1;
+
     const fCtm = document.getElementById('filtro-ctm').value.toLowerCase();
     const fProc = formatProcessoParaDB(document.getElementById('filtro-proc').value.toLowerCase());
     const fFunc = document.getElementById('filtro-func').value;
     const fAss = document.getElementById('filtro-assunto').value;
 
-    let filtered = processosData.filter(p => {
+    filteredList = processosData.filter(p => {
         let match = true;
         if(fCtm && !(p.ctm || '').toLowerCase().includes(fCtm)) match = false;
         if(fProc && !(p.processo || '').toLowerCase().includes(fProc)) match = false;
@@ -151,68 +296,169 @@ function renderTabelaGeral() {
         return match;
     });
 
+    // Ordena do mais recente (maior ID / push key do firebase) para o mais antigo, se desejar
+    // filteredList.reverse(); 
+
+    renderPaginaAtual();
+}
+
+function renderPaginaAtual() {
     const thead = document.getElementById('thead-geral');
     const tbody = document.getElementById('tbody-geral');
     
-    // Headers dinâmicos
+    const totalItems = filteredList.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+    
+    if(currentPage > totalPages) currentPage = totalPages;
+    if(currentPage < 1) currentPage = 1;
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    const paginatedItems = filteredList.slice(startIndex, endIndex);
+
+    // Renderiza Headers dependendo da tela
     if(currentMode === 'edicao') {
         thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Funcionários</th><th>Ações</th>`;
+    } else if(currentMode === 'pesquisa') {
+        thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Dias</th><th>Funcionário</th><th>Status</th><th>Detalhes</th>`;
     } else {
         thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Dias</th><th>Funcionário</th><th>Status</th><th>Ações</th>`;
     }
 
-    tbody.innerHTML = filtered.map(p => {
+    // Renderiza o corpo
+    tbody.innerHTML = paginatedItems.map(p => {
         let dias = calcularDias(p.entrada);
         let tr = '';
+        
         if(currentMode === 'edicao') {
-            tr = `<td>${p.ctm||''}</td><td>${formatProcessoParaTela(p.processo||'')}</td><td>${p.assunto||''}</td><td>${p.funcionario||''}</td>
+            tr = `<td>${p.ctm||''}</td>
+                  <td>${formatProcessoParaTela(p.processo||'')}</td>
+                  <td>${p.assunto||''}</td>
+                  <td>${p.funcionario||''}</td>
                   <td><button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button></td>`;
+        } else if (currentMode === 'pesquisa') {
+             tr = `<td>${p.ctm||''}</td>
+                  <td>${formatProcessoParaTela(p.processo||'')}</td>
+                  <td>${p.assunto||''}</td>
+                  <td>${p.entrada||''}</td>
+                  <td>${dias}</td>
+                  <td>${p.funcionario||''}</td>
+                  <td>${p.status||''}</td>
+                  <td>${p.observacao||''}</td>`;
         } else {
-            let acoes = currentMode === 'base' ? 
-                `<button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button> <button class="btn btn--error btn--sm" style="background:red;color:white;" onclick="deletarProcesso('${p.id}')">Excluir</button>` : '';
-            tr = `<td>${p.ctm||''}</td><td>${formatProcessoParaTela(p.processo||'')}</td><td>${p.assunto||''}</td><td>${p.entrada||''}</td><td>${dias}</td><td>${p.funcionario||''}</td><td>${p.status||''}</td><td>${acoes}</td>`;
+            let acoes = `
+                <button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button> 
+                <button class="btn btn--error btn--sm" style="background:red; color:white; border:none;" onclick="deletarProcesso('${p.id}')">Excluir</button>`;
+            
+            tr = `<td>${p.ctm||''}</td>
+                  <td>${formatProcessoParaTela(p.processo||'')}</td>
+                  <td>${p.assunto||''}</td>
+                  <td>${p.entrada||''}</td>
+                  <td>${dias}</td>
+                  <td>${p.funcionario||''}</td>
+                  <td>${p.status||''}</td>
+                  <td>${acoes}</td>`;
         }
         return `<tr>${tr}</tr>`;
     }).join('');
+
+    // Atualiza controles de paginação
+    document.getElementById('page-info').innerText = `Página ${currentPage} de ${totalPages} (Total: ${totalItems} registros)`;
+    document.getElementById('btn-prev-page').disabled = (currentPage === 1);
+    document.getElementById('btn-next-page').disabled = (currentPage === totalPages);
 }
 
-// Edição
+window.mudarPagina = function(direction) {
+    const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
+    currentPage += direction;
+    
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    
+    renderPaginaAtual();
+}
+
+// =========================================================================
+// EDIÇÃO E EXCLUSÃO
+// =========================================================================
 window.abrirEdicao = function(id) {
     const p = processosData.find(x => x.id === id);
     if(!p) return;
     
     const body = document.getElementById('modal-edicao-body');
+    
+    // Gerar selects dinâmicos para a edição
+    const selAssuntos = configData.Assuntos.map(a => `<option value="${a}" ${p.assunto === a ? 'selected' : ''}>${a}</option>`).join('');
+    const selFuncs = configData.Cadastradores.map(a => `<option value="${a}" ${p.funcionario === a ? 'selected' : ''}>${a}</option>`).join('');
+    const selStatus = configData.Status.map(a => `<option value="${a}" ${p.status === a ? 'selected' : ''}>${a}</option>`).join('');
+
     body.innerHTML = `
-        <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p.processo||'')}"></div>
-        <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${p.ctm||''}"></div>
-        <div class="form-group"><label>Status</label><input type="text" id="edit-status" class="form-control" value="${p.status||''}"></div>
+        <div class="filters-row">
+            <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${p.ctm||''}"></div>
+            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p.processo||'')}"></div>
+            <div class="form-group"><label>Assunto</label><select id="edit-assunto" class="form-control"><option value="">Selecione...</option>${selAssuntos}</select></div>
+            <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${p.entrada||''}"></div>
+            <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
+            <div class="form-group"><label>Status</label><select id="edit-status" class="form-control"><option value="">Selecione...</option>${selStatus}</select></div>
+            <div class="form-group"><label>Vistoria</label><input type="text" id="edit-vist" class="form-control" value="${p.vistoria||''}"></div>
+            <div class="form-group"><label>1ª Vist</label><input type="text" id="edit-v1" class="form-control" value="${p.v1||''}"></div>
+            <div class="form-group"><label>2ª Vist</label><input type="text" id="edit-v2" class="form-control" value="${p.v2||''}"></div>
+            <div class="form-group"><label>3ª Vist</label><input type="text" id="edit-v3" class="form-control" value="${p.v3||''}"></div>
+            <div class="form-group"><label>Data Saída</label><input type="text" id="edit-saida" class="form-control" value="${p.saida||''}"></div>
+            <div class="form-group"><label>Destino</label><input type="text" id="edit-destino" class="form-control" value="${p.destino||''}"></div>
+        </div>
+        <div class="form-group mt-8">
+            <label>Observação</label>
+            <textarea id="edit-obs" class="form-control" rows="3">${p.observacao||''}</textarea>
+        </div>
     `;
     document.getElementById('modal-edicao').classList.remove('hidden');
     
     document.getElementById('btn-salvar-edicao').onclick = async () => {
+        const btnSalvar = document.getElementById('btn-salvar-edicao');
+        btnSalvar.innerText = "Salvando...";
+        
         await update(ref(db, 'processos/' + id), {
-            processo: formatProcessoParaDB(document.getElementById('edit-proc').value),
             ctm: document.getElementById('edit-ctm').value,
-            status: document.getElementById('edit-status').value
+            processo: formatProcessoParaDB(document.getElementById('edit-proc').value),
+            assunto: document.getElementById('edit-assunto').value,
+            entrada: document.getElementById('edit-entrada').value,
+            funcionario: document.getElementById('edit-func').value,
+            status: document.getElementById('edit-status').value,
+            vistoria: document.getElementById('edit-vist').value,
+            v1: document.getElementById('edit-v1').value,
+            v2: document.getElementById('edit-v2').value,
+            v3: document.getElementById('edit-v3').value,
+            saida: document.getElementById('edit-saida').value,
+            destino: document.getElementById('edit-destino').value,
+            observacao: document.getElementById('edit-obs').value
         });
+        
+        btnSalvar.innerText = "Salvar Edição";
         document.getElementById('modal-edicao').classList.add('hidden');
-        renderTabelaGeral();
     };
 }
+
 window.deletarProcesso = async function(id) {
-    if(confirm("Tem certeza que deseja excluir?")) {
+    if(confirm("Tem certeza que deseja excluir permanentemente esta entrada?")) {
         await remove(ref(db, 'processos/' + id));
-        renderTabelaGeral();
     }
 }
 
-// Consulta Pública
+// =========================================================================
+// CONSULTA PÚBLICA (TELA INICIAL)
+// =========================================================================
 document.getElementById('btn-consultar-publico').addEventListener('click', () => {
-    const fCtm = document.getElementById('consulta-ctm').value.toLowerCase();
-    const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value.toLowerCase());
+    const fCtm = document.getElementById('consulta-ctm').value.toLowerCase().trim();
+    const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value.toLowerCase().trim());
     
     const tbody = document.getElementById('tbody-consulta-publica');
-    if(!fCtm && !fProc) return alert("Preencha CTM ou Processo");
+    
+    if(!fCtm && !fProc) {
+        alert("Preencha CTM ou Processo para consultar.");
+        return;
+    }
 
     const res = processosData.filter(p => {
         let match = false;
@@ -221,15 +467,27 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
         return match;
     });
 
+    if(res.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center">Nenhum processo encontrado.</td></tr>`;
+        return;
+    }
+
     tbody.innerHTML = res.map(p => `<tr>
-        <td>${p.ctm||''}</td><td>${formatProcessoParaTela(p.processo||'')}</td><td>${p.assunto||''}</td><td>${p.entrada||''}</td><td>${p.funcionario||''}</td><td>${p.status||''}</td>
-        <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">${p.observacao||''}</div></td>
+        <td>${p.ctm||''}</td>
+        <td>${formatProcessoParaTela(p.processo||'')}</td>
+        <td>${p.assunto||''}</td>
+        <td>${p.entrada||''}</td>
+        <td>${p.funcionario||''}</td>
+        <td>${p.status||''}</td>
+        <td><div style="max-width:200px; white-space:normal; word-wrap:break-word;">${p.observacao||''}</div></td>
     </tr>`).join('');
 });
 
-// Estatísticas
-let charts = [];
+// =========================================================================
+// ESTATÍSTICAS
+// =========================================================================
 document.getElementById('stat-funcionario').addEventListener('change', renderStats);
+
 function renderStats() {
     if(!document.getElementById('estatisticas-screen').classList.contains('active')) return;
     
@@ -241,15 +499,26 @@ function renderStats() {
     let mensais = 0;
     let concluidos = 0;
     let concluidosMes = 0;
+    
+    // Totais do setor (Geral) para calcular proporção
+    let totalSetorAssuntoMes = {};
+    let totalSetorAssuntoAno = {};
 
     processosData.forEach(p => {
         const d = parseDateBR(p.entrada);
         let isMes = d && (d.getMonth() + 1) === currMonth && d.getFullYear() === currYear;
+        let isAno = d && d.getFullYear() === currYear;
         let isConcl = (p.status === 'Concluído');
         
         if(isMes) mensais++;
         if(isConcl) concluidos++;
         if(isConcl && isMes) concluidosMes++;
+        
+        if(!totalSetorAssuntoMes[p.assunto]) totalSetorAssuntoMes[p.assunto] = 0;
+        if(!totalSetorAssuntoAno[p.assunto]) totalSetorAssuntoAno[p.assunto] = 0;
+        
+        if(isMes) totalSetorAssuntoMes[p.assunto]++;
+        if(isAno) totalSetorAssuntoAno[p.assunto]++;
     });
 
     document.getElementById('st-total').innerText = totalEntradas;
@@ -257,7 +526,7 @@ function renderStats() {
     document.getElementById('st-concl').innerText = concluidos;
     document.getElementById('st-concl-mes').innerText = concluidosMes;
     
-    // Tabela Funcionario Especifico
+    // Tabela do Funcionário Específico
     const funcSel = document.getElementById('stat-funcionario').value;
     const tbody = document.getElementById('tbody-stats-func');
     tbody.innerHTML = '';
@@ -283,19 +552,64 @@ function renderStats() {
         });
         
         let html = '';
+        let totais = { qtd:0, mes:0, ano:0, setorMes:0, setorAno:0, cTotal:0, cMes:0, cAno:0 };
+        
         Object.keys(assuntosMap).forEach(k => {
             if(assuntosMap[k].qtd > 0) {
-                html += `<tr><td>${k}</td><td>${assuntosMap[k].qtd}</td><td>${assuntosMap[k].mes}</td><td>${assuntosMap[k].ano}</td>
-                <td>-</td><td>-</td><td>-</td><td>-</td><td>${assuntosMap[k].cTotal}</td><td>${assuntosMap[k].cMes}</td><td>${assuntosMap[k].cAno}</td></tr>`;
+                let v = assuntosMap[k];
+                let sMes = totalSetorAssuntoMes[k] || 0;
+                let sAno = totalSetorAssuntoAno[k] || 0;
+                
+                let pMes = sMes > 0 ? ((v.mes / sMes) * 100).toFixed(1) + '%' : '0%';
+                let pAno = sAno > 0 ? ((v.ano / sAno) * 100).toFixed(1) + '%' : '0%';
+                
+                totais.qtd += v.qtd;
+                totais.mes += v.mes;
+                totais.ano += v.ano;
+                totais.cTotal += v.cTotal;
+                totais.cMes += v.cMes;
+                totais.cAno += v.cAno;
+                
+                html += `<tr>
+                    <td>${k}</td>
+                    <td>${v.qtd}</td>
+                    <td>${v.mes}</td>
+                    <td>${v.ano}</td>
+                    <td>${sMes}</td>
+                    <td>${pMes}</td>
+                    <td>${sAno}</td>
+                    <td>${pAno}</td>
+                    <td>${v.cTotal}</td>
+                    <td>${v.cMes}</td>
+                    <td>${v.cAno}</td>
+                </tr>`;
             }
         });
+        
+        // Linha de totais
+        html += `<tr style="font-weight: bold; background-color: var(--color-bg-2);">
+            <td>TOTAL</td>
+            <td>${totais.qtd}</td>
+            <td>${totais.mes}</td>
+            <td>${totais.ano}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>${totais.cTotal}</td>
+            <td>${totais.cMes}</td>
+            <td>${totais.cAno}</td>
+        </tr>`;
+        
         tbody.innerHTML = html;
+    } else {
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center">Selecione um funcionário para ver as estatísticas.</td></tr>`;
     }
     
-    // Gerar Graficos (Top 6)
     renderCharts(currMonth, currYear);
 }
 
+// GRÁFICOS (Chart.js)
 function renderCharts(mes, ano) {
     charts.forEach(c => c.destroy());
     charts = [];
@@ -306,27 +620,47 @@ function renderCharts(mes, ano) {
     
     processosData.forEach(p => {
         const d = parseDateBR(p.entrada);
-        if(d && (d.getMonth() + 1) === mes && d.getFullYear() === ano) {
+        let isMes = d && (d.getMonth() + 1) === mes && d.getFullYear() === ano;
+        
+        if(isMes && p.assunto) {
             assCount[p.assunto] = (assCount[p.assunto]||0) + 1;
+        }
+        if(isMes && p.funcionario) {
             funcCount[p.funcionario] = (funcCount[p.funcionario]||0) + 1;
         }
-        if(p.status === 'Concluído') {
+        if(p.status === 'Concluído' && p.funcionario) {
             funcConclCount[p.funcionario] = (funcConclCount[p.funcionario]||0) + 1;
         }
     });
 
-    const sortTop6 = (obj) => Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const sortTop6 = (obj) => Object.entries(obj).sort((a,b) => b[1]-a[1]).slice(0,6);
     
     const topAssuntos = sortTop6(assCount);
     const topFuncs = sortTop6(funcCount);
     const topFuncsConcl = sortTop6(funcConclCount);
 
     const createChart = (id, label, dataArr, color) => {
-        const ctx = document.getElementById(id).getContext('2d');
+        const canvas = document.getElementById(id);
+        if(!canvas) return; // Evita erro caso o canvas não esteja na tela
+        
+        const ctx = canvas.getContext('2d');
         charts.push(new Chart(ctx, {
             type: 'bar',
-            data: { labels: dataArr.map(d=>d[0]), datasets: [{ label: label, data: dataArr.map(d=>d[1]), backgroundColor: color }] },
-            options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            data: { 
+                labels: dataArr.map(d => d[0]), 
+                datasets: [{ 
+                    label: label, 
+                    data: dataArr.map(d => d[1]), 
+                    backgroundColor: color 
+                }] 
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: { 
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } } 
+                } 
+            }
         }));
     };
 
