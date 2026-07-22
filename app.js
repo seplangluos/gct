@@ -314,10 +314,10 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
     const rawCtm = document.getElementById('cad-ctm').value;
     const ctmMascarado = maskCTM(rawCtm);
     const entradaFmt = formatDateBR(document.getElementById('cad-entrada').value);
-    const dataStatusFmt = formatDateBR(document.getElementById('cad-data-status').value);
+    const DataStatusFmt = formatDateBR(document.getElementById('cad-data-status').value);
 
     const diasCalculados = calcularDias(entradaFmt).toString();
-    const diasStatusCalculados = calcularDias(dataStatusFmt).toString();
+    const diasStatusCalculados = calcularDias(DataStatusFmt).toString();
 
     const obj = {
         "ctm": ctmMascarado,
@@ -621,9 +621,9 @@ window.abrirEdicao = function(id) {
         btnSalvar.innerText = "Salvando...";
         
         const entradaFmt = formatDateBR(document.getElementById('edit-entrada').value);
-        const dataStatusFmt = formatDateBR(document.getElementById('edit-data-status').value);
+        const DataStatusFmt = formatDateBR(document.getElementById('edit-data-status').value);
         const diasCalculados = calcularDias(entradaFmt).toString();
-        const diasStatusCalculados = calcularDias(dataStatusFmt).toString();
+        const diasStatusCalculados = calcularDias(DataStatusFmt).toString();
 
         await update(ref(db, 'processos/' + id), {
             "ctm": maskCTM(document.getElementById('edit-ctm').value),
