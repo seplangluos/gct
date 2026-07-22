@@ -63,7 +63,6 @@ function calcularDias(dataEntradaStr) {
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
-// Limpa pontos, traços e espaços do CTM para facilitar a pesquisa
 function normalizeCTM(ctm) {
     return ctm ? ctm.toString().replace(/[\.\-\/\s]/g, '').toLowerCase() : '';
 }
@@ -142,28 +141,24 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-// Força o carregamento dos dados para permitir a consulta pública
 loadData();
 
 // =========================================================================
-// CARREGAMENTO DE DADOS (REALTIME) - DIRETO DA RAIZ
+// CARREGAMENTO DE DADOS (REALTIME)
 // =========================================================================
 function loadData() {
-    // 1. Carrega Assuntos
     onValue(ref(db, 'Assuntos'), snap => {
         configData.Assuntos = snap.exists() ? snap.val() : [];
         populateSelects();
         renderConfigListsIfActive();
     });
 
-    // 2. Carrega Cadastradores (Funcionários)
     onValue(ref(db, 'Cadastradores'), snap => {
         configData.Cadastradores = snap.exists() ? snap.val() : [];
         populateSelects();
         renderConfigListsIfActive();
     });
 
-    // 3. Carrega Status
     onValue(ref(db, 'Status'), snap => {
         if(snap.exists()) {
             configData.Status = snap.val();
@@ -172,12 +167,10 @@ function loadData() {
         renderConfigListsIfActive();
     });
 
-    // 4. Carrega Processos
     onValue(ref(db, 'processos'), snap => {
         processosData = [];
         if(snap.exists()) {
             const data = snap.val();
-            // Lida com arrays (JSON importado) ou objetos padrão do Firebase
             Object.keys(data).forEach(key => {
                 if(data[key]) {
                     processosData.push({ id: key, ...data[key] });
@@ -217,7 +210,7 @@ function populateSelects() {
 }
 
 // =========================================================================
-// CONFIGURAÇÕES (Adicionar/Remover itens direto na raiz)
+// CONFIGURAÇÕES
 // =========================================================================
 function renderConfigLists() {
     const gerarHtml = (arr, chave) => {
@@ -241,7 +234,7 @@ window.addConfigItem = async function(chave, inputId) {
     const novaLista = [...(configData[chave] || []), valor];
     
     try {
-        await set(ref(db, chave), novaLista); // Salva na raiz (ex: /Assuntos)
+        await set(ref(db, chave), novaLista);
         document.getElementById(inputId).value = '';
     } catch(err) { 
         alert("Erro ao salvar: " + err.message); 
@@ -255,7 +248,7 @@ window.removerConfigItem = async function(chave, index) {
     novaLista.splice(index, 1);
     
     try {
-        await set(ref(db, chave), novaLista); // Remove da raiz
+        await set(ref(db, chave), novaLista); 
     } catch(err) { 
         alert("Erro ao remover: " + err.message); 
     }
@@ -348,6 +341,13 @@ function renderTabelaGeral(resetPage = false) {
         return match;
     });
 
+    // Ordenar da data de entrada mais recente para a mais antiga
+    filteredList.sort((a, b) => {
+        const dateA = parseDateBR(a.entrada) || new Date(0);
+        const dateB = parseDateBR(b.entrada) || new Date(0);
+        return dateB - dateA;
+    });
+
     renderPaginaAtual();
 }
 
@@ -367,7 +367,7 @@ function renderPaginaAtual() {
     const paginatedItems = filteredList.slice(startIndex, endIndex);
 
     if(currentMode === 'edicao') {
-        thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Funcionários</th><th>Ações</th>`;
+        thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Funcionários</th><th>Ações</th>`;
     } else if(currentMode === 'pesquisa') {
         thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Dias</th><th>Funcionário</th><th>Status</th><th>Detalhes</th>`;
     } else {
@@ -382,6 +382,7 @@ function renderPaginaAtual() {
             tr = `<td>${p.ctm||''}</td>
                   <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
+                  <td>${p.entrada||''}</td>
                   <td>${p['funcionários']||''}</td>
                   <td><button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button></td>`;
         } else if (currentMode === 'pesquisa') {
@@ -551,6 +552,7 @@ function renderStats() {
     let concluidos = 0;
     let concluidosMes = 0;
     
+    // Arrays para guardar o total geral do SETOR (para todos os funcionários)
     let totalSetorAssuntoMes = {};
     let totalSetorAssuntoAno = {};
 
@@ -564,6 +566,7 @@ function renderStats() {
         if(isConcl) concluidos++;
         if(isConcl && isMes) concluidosMes++;
         
+        // Povoando total do setor
         if(!totalSetorAssuntoMes[p.assunto]) totalSetorAssuntoMes[p.assunto] = 0;
         if(!totalSetorAssuntoAno[p.assunto]) totalSetorAssuntoAno[p.assunto] = 0;
         
@@ -615,6 +618,8 @@ function renderStats() {
                 totais.qtd += v.qtd;
                 totais.mes += v.mes;
                 totais.ano += v.ano;
+                totais.setorMes += sMes;
+                totais.setorAno += sAno;
                 totais.cTotal += v.cTotal;
                 totais.cMes += v.cMes;
                 totais.cAno += v.cAno;
@@ -635,18 +640,34 @@ function renderStats() {
             }
         });
         
+        // Linha com a soma total
         html += `<tr style="font-weight: bold; background-color: var(--color-bg-2);">
             <td>TOTAL</td>
             <td>${totais.qtd}</td>
             <td>${totais.mes}</td>
             <td>${totais.ano}</td>
+            <td>${totais.setorMes}</td>
             <td>-</td>
-            <td>-</td>
-            <td>-</td>
+            <td>${totais.setorAno}</td>
             <td>-</td>
             <td>${totais.cTotal}</td>
             <td>${totais.cMes}</td>
             <td>${totais.cAno}</td>
+        </tr>`;
+
+        // Repete o cabeçalho no rodapé da tabela
+        html += `<tr style="background: var(--color-bg-3); color: var(--color-primary); font-weight: bold;">
+            <th>Assunto</th>
+            <th>QTD</th>
+            <th>Mensal</th>
+            <th>Anual</th>
+            <th>Total Setor Mês</th>
+            <th>% Mês</th>
+            <th>Total Setor Ano</th>
+            <th>% Ano</th>
+            <th>Concluídos</th>
+            <th>Concl. Mês</th>
+            <th>Concl. Ano</th>
         </tr>`;
         
         tbody.innerHTML = html;
@@ -676,7 +697,8 @@ function renderCharts(mes, ano) {
         if(isMes && p['funcionários']) {
             funcCount[p['funcionários']] = (funcCount[p['funcionários']]||0) + 1;
         }
-        if(p.status === 'Concluído' && p['funcionários']) {
+        // Gráfico 3: Apenas Concluídos filtrados pelo MÊS atual
+        if(isMes && p.status === 'Concluído' && p['funcionários']) {
             funcConclCount[p['funcionários']] = (funcConclCount[p['funcionários']]||0) + 1;
         }
     });
@@ -714,5 +736,5 @@ function renderCharts(mes, ano) {
 
     createChart('chart1', 'Top Assuntos (Mês)', topAssuntos, '#32b8c6');
     createChart('chart2', 'Entradas por Funcionário', topFuncs, '#e68161');
-    createChart('chart3', 'Concluídos por Funcionário', topFuncsConcl, '#22c55e');
+    createChart('chart3', 'Concluídos por Funcionário (Mês)', topFuncsConcl, '#22c55e');
 }
