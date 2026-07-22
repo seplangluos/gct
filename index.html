@@ -186,6 +186,55 @@
             </div>
         </div>
     </div>
+<div id="configuracoes-screen" class="screen">
+        <div class="screen-header">
+            <div class="container flex justify-between items-center">
+                <h2>Configurações do Sistema</h2>
+                <button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button>
+            </div>
+        </div>
+        <div class="container mt-8">
+            <div class="filters-row">
+                
+                <!-- Card Assuntos -->
+                <div class="card">
+                    <div class="card__header"><h4>Assuntos</h4></div>
+                    <div class="card__body">
+                        <div class="flex gap-8 mb-8">
+                            <input type="text" id="novo-assunto" class="form-control" placeholder="Novo assunto...">
+                            <button class="btn btn--success" onclick="addConfigItem('Assuntos', 'novo-assunto')">+</button>
+                        </div>
+                        <ul id="lista-assuntos" class="guide-list" style="max-height: 300px; overflow-y: auto;"></ul>
+                    </div>
+                </div>
+
+                <!-- Card Funcionários -->
+                <div class="card">
+                    <div class="card__header"><h4>Funcionários</h4></div>
+                    <div class="card__body">
+                        <div class="flex gap-8 mb-8">
+                            <input type="text" id="novo-funcionario" class="form-control" placeholder="Novo funcionário...">
+                            <button class="btn btn--success" onclick="addConfigItem('Cadastradores', 'novo-funcionario')">+</button>
+                        </div>
+                        <ul id="lista-funcionarios" class="guide-list" style="max-height: 300px; overflow-y: auto;"></ul>
+                    </div>
+                </div>
+
+                <!-- Card Status -->
+                <div class="card">
+                    <div class="card__header"><h4>Status</h4></div>
+                    <div class="card__body">
+                        <div class="flex gap-8 mb-8">
+                            <input type="text" id="novo-status" class="form-control" placeholder="Novo status...">
+                            <button class="btn btn--success" onclick="addConfigItem('Status', 'novo-status')">+</button>
+                        </div>
+                        <ul id="lista-status" class="guide-list" style="max-height: 300px; overflow-y: auto;"></ul>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
 
     <!-- MODAL DE EDIÇÃO -->
     <div id="modal-edicao" class="modal hidden">
