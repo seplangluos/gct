@@ -17,7 +17,7 @@
                     <p class="login-subtitle">Prefeitura Municipal</p>
                     
                     <form id="login-form" class="login-form text-left mt-8">
-                       <div class="form-group">
+                        <div class="form-group">
                             <label class="form-label">Usuário:</label>
                             <select id="login-usuario" class="form-control" required>
                                 <option value="">Selecione o usuário</option>
@@ -56,7 +56,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Funcionário</th><th>Status</th><th>Detalhes</th>
+                                    <th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Funcionário</th><th>Status</th><th>Data Status</th><th>Dias Status</th><th>Destino</th><th>Detalhes</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-consulta-publica"></tbody>
@@ -97,18 +97,19 @@
             <form id="form-cadastro" class="card form-container">
                 <div class="card__body">
                     <div class="filters-row">
-                        <div class="form-group"><label>CTM (9 dígitos)</label><input type="text" id="cad-ctm" class="form-control" maxlength="9"></div>
+                        <div class="form-group"><label>CTM (9 dígitos)</label><input type="text" id="cad-ctm" class="form-control" maxlength="12"></div>
                         <div class="form-group"><label>Nº de Processo *</label><input type="text" id="cad-processo" class="form-control" required placeholder="00000/0000"></div>
                         <div class="form-group"><label>Assunto *</label><select id="cad-assunto" class="form-control dyn-assuntos" required></select></div>
                         <div class="form-group"><label>Data de Entrada</label><input type="text" id="cad-entrada" class="form-control" placeholder="dd/mm/aaaa"></div>
                         <div class="form-group"><label>Funcionário</label><select id="cad-funcionario" class="form-control dyn-funcionarios"></select></div>
                         <div class="form-group"><label>Status</label><select id="cad-status" class="form-control dyn-status"></select></div>
+                        <div class="form-group"><label>Data Status</label><input type="text" id="cad-data-status" class="form-control" placeholder="dd/mm/aaaa"></div>
                         <div class="form-group"><label>Vistoria</label><input type="text" id="cad-vistoria" class="form-control" placeholder="dd/mm/aaaa"></div>
                         <div class="form-group"><label>1ª Vistoria</label><input type="text" id="cad-v1" class="form-control" placeholder="dd/mm/aaaa"></div>
                         <div class="form-group"><label>2ª Vistoria</label><input type="text" id="cad-v2" class="form-control" placeholder="dd/mm/aaaa"></div>
                         <div class="form-group"><label>3ª Vistoria</label><input type="text" id="cad-v3" class="form-control" placeholder="dd/mm/aaaa"></div>
                         <div class="form-group"><label>Data Saída</label><input type="text" id="cad-saida" class="form-control" placeholder="dd/mm/aaaa"></div>
-                        <div class="form-group"><label>Destino</label><input type="text" id="cad-destino" class="form-control"></div>
+                        <div class="form-group"><label>Destino</label><select id="cad-destino" class="form-control dyn-destinos"></select></div>
                     </div>
                     <div class="form-group mt-8">
                         <label>Observação</label>
@@ -120,15 +121,9 @@
         </div>
     </div>
 
-    <!-- OUTRAS TELAS (Edição, Pesquisa, Base, Estatísticas, Config) -->
-    <!-- (Para manter o nível de esforço e o código compacto, usaremos uma estrutura unificada de tabela para Base/Edição/Pesquisa, controlada via JS) -->
-<div id="tabela-geral-screen" class="screen">
-        <div class="screen-header">
-            <div class="container flex justify-between items-center">
-                <h2 id="titulo-tabela">Base de Dados</h2>
-                <button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button>
-            </div>
-        </div>
+    <!-- TELA DE TABELA GERAL (Base, Edição, Pesquisa) -->
+    <div id="tabela-geral-screen" class="screen">
+        <div class="screen-header"><div class="container flex justify-between items-center"><h2 id="titulo-tabela">Base de Dados</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
         <div class="container mt-8">
             <div class="card mb-8">
                 <div class="card__body flex gap-16 flex-wrap" id="filtros-container">
@@ -136,11 +131,18 @@
                     <input type="text" id="filtro-proc" class="form-control" placeholder="Nº Processo">
                     <select id="filtro-func" class="form-control dyn-funcionarios"><option value="">Todos Funcionários</option></select>
                     <select id="filtro-assunto" class="form-control dyn-assuntos"><option value="">Todos Assuntos</option></select>
-                    <button id="btn-filtrar-geral" class="btn btn--primary">Pesquisar / Filtrar</button>
+                    <button id="btn-filtrar-geral" class="btn btn--primary">Pesquisar/Filtrar</button>
                 </div>
             </div>
-            
             <div class="card">
+                <!-- Filtros adicionais nas colunas específicas -->
+                <div class="card__header flex gap-8 flex-wrap" style="background: var(--color-bg-1);">
+                    <select id="col-filter-assunto" class="form-control dyn-assuntos" style="max-width: 200px;"><option value="">Filtrar Assunto...</option></select>
+                    <select id="col-filter-func" class="form-control dyn-funcionarios" style="max-width: 200px;"><option value="">Filtrar Funcionário...</option></select>
+                    <select id="col-filter-status" class="form-control dyn-status" style="max-width: 150px;"><option value="">Filtrar Status...</option></select>
+                    <select id="col-filter-destino" class="form-control dyn-destinos" style="max-width: 150px;"><option value="">Filtrar Destino...</option></select>
+                    <select id="col-filter-datamask" class="form-control" style="max-width: 180px;"><option value="">Filtrar Mês/Ano (Data Status)...</option></select>
+                </div>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -149,7 +151,7 @@
                         <tbody id="tbody-geral"></tbody>
                     </table>
                 </div>
-                <!-- CONTROLES DE PAGINAÇÃO -->
+                <!-- PAGINAÇÃO -->
                 <div class="card__footer flex justify-between items-center" style="padding: 16px; background: var(--color-surface); border-top: 1px solid var(--color-border);">
                     <span id="page-info" style="font-weight: 500; color: var(--color-text-secondary);">Mostrando página 1</span>
                     <div class="flex gap-8">
@@ -186,11 +188,13 @@
             <div class="filters-row">
                 <div class="card"><div class="card__header"><h4>Top 6 Assuntos (Mês)</h4></div><div class="card__body"><canvas id="chart1"></canvas></div></div>
                 <div class="card"><div class="card__header"><h4>Top 6 Funcionários (Entradas Mês)</h4></div><div class="card__body"><canvas id="chart2"></canvas></div></div>
-                <div class="card"><div class="card__header"><h4>Top 6 Funcionários (Concluídos)</h4></div><div class="card__body"><canvas id="chart3"></canvas></div></div>
+                <div class="card"><div class="card__header"><h4>Top 6 Funcionários (Concluídos Mês)</h4></div><div class="card__body"><canvas id="chart3"></canvas></div></div>
             </div>
         </div>
     </div>
-<div id="configuracoes-screen" class="screen">
+
+    <!-- TELA DE CONFIGURAÇÕES -->
+    <div id="configuracoes-screen" class="screen">
         <div class="screen-header">
             <div class="container flex justify-between items-center">
                 <h2>Configurações do Sistema</h2>
@@ -199,43 +203,38 @@
         </div>
         <div class="container mt-8">
             <div class="filters-row">
-                
-                <!-- Card Assuntos -->
+                <!-- Assuntos -->
                 <div class="card">
                     <div class="card__header"><h4>Assuntos</h4></div>
                     <div class="card__body">
-                        <div class="flex gap-8 mb-8">
-                            <input type="text" id="novo-assunto" class="form-control" placeholder="Novo assunto...">
-                            <button class="btn btn--success" onclick="addConfigItem('Assuntos', 'novo-assunto')">+</button>
-                        </div>
-                        <ul id="lista-assuntos" class="guide-list" style="max-height: 300px; overflow-y: auto;"></ul>
+                        <div class="flex gap-8 mb-8"><input type="text" id="novo-assunto" class="form-control" placeholder="Novo assunto..."><button class="btn btn--success" onclick="addConfigItem('Assuntos', 'novo-assunto')">+</button></div>
+                        <ul id="lista-assuntos" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
                     </div>
                 </div>
-
-                <!-- Card Funcionários -->
+                <!-- Funcionários -->
                 <div class="card">
                     <div class="card__header"><h4>Funcionários</h4></div>
                     <div class="card__body">
-                        <div class="flex gap-8 mb-8">
-                            <input type="text" id="novo-funcionario" class="form-control" placeholder="Novo funcionário...">
-                            <button class="btn btn--success" onclick="addConfigItem('Cadastradores', 'novo-funcionario')">+</button>
-                        </div>
-                        <ul id="lista-funcionarios" class="guide-list" style="max-height: 300px; overflow-y: auto;"></ul>
+                        <div class="flex gap-8 mb-8"><input type="text" id="novo-funcionario" class="form-control" placeholder="Novo funcionário..."><button class="btn btn--success" onclick="addConfigItem('Cadastradores', 'novo-funcionario')">+</button></div>
+                        <ul id="lista-funcionarios" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
                     </div>
                 </div>
-
-                <!-- Card Status -->
+                <!-- Status -->
                 <div class="card">
                     <div class="card__header"><h4>Status</h4></div>
                     <div class="card__body">
-                        <div class="flex gap-8 mb-8">
-                            <input type="text" id="novo-status" class="form-control" placeholder="Novo status...">
-                            <button class="btn btn--success" onclick="addConfigItem('Status', 'novo-status')">+</button>
-                        </div>
-                        <ul id="lista-status" class="guide-list" style="max-height: 300px; overflow-y: auto;"></ul>
+                        <div class="flex gap-8 mb-8"><input type="text" id="novo-status" class="form-control" placeholder="Novo status..."><button class="btn btn--success" onclick="addConfigItem('Status', 'novo-status')">+</button></div>
+                        <ul id="lista-status" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
                     </div>
                 </div>
-
+                <!-- Destinos -->
+                <div class="card">
+                    <div class="card__header"><h4>Destinos</h4></div>
+                    <div class="card__body">
+                        <div class="flex gap-8 mb-8"><input type="text" id="novo-destino" class="form-control" placeholder="Novo destino..."><button class="btn btn--success" onclick="addConfigItem('Destinos', 'novo-destino')">+</button></div>
+                        <ul id="lista-destinos" class="guide-list" style="max-height: 250px; overflow-y: auto;"></ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -244,14 +243,11 @@
     <div id="modal-edicao" class="modal hidden">
         <div class="modal-content modal-content--large">
             <div class="modal-header"><h3>Editar Entrada</h3></div>
-            <div class="modal-body" id="modal-edicao-body">
-                <!-- Preenchido via JS dinamicamente aproveitando os campos -->
-            </div>
+            <div class="modal-body" id="modal-edicao-body"></div>
             <div class="modal-footer"><button id="btn-salvar-edicao" class="btn btn--success">Salvar Edição</button><button class="btn btn--outline" onclick="document.getElementById('modal-edicao').classList.add('hidden')">Cancelar</button></div>
         </div>
     </div>
 
-    <!-- CARREGAR O APP -->
     <script type="module" src="app.js"></script>
 </body>
 </html>

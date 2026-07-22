@@ -22,18 +22,22 @@ const auth = getAuth(app);
 // =========================================================================
 // VARIÁVEIS GLOBAIS
 // =========================================================================
-let configData = { Assuntos: [], Cadastradores: [], Status: ["Concluído", "Em andamento", "Parado"] };
+let configData = { Assuntos: [], Cadastradores: [], Status: ["Concluído", "Em andamento", "Parado"], Destinos: ["SAG", "GAE"] };
 let processosData = [];
-let currentMode = ''; // 'edicao', 'pesquisa', 'base'
+let currentMode = ''; 
 let charts = [];
 
-// Variáveis de Paginação
+// Paginação
 let currentPage = 1;
 const itemsPerPage = 50;
 let filteredList = []; 
 
+// Ordenação dinâmica das colunas (asc/desc)
+let currentSortColumn = null;
+let currentSortDirection = 'desc'; // Padrão: mais recente primeiro
+
 // =========================================================================
-// UTILITÁRIOS
+// UTILITÁRIOS E MÁSCARAS
 // =========================================================================
 function formatProcessoParaDB(proc) { 
     return proc ? proc.toString().replace(/\//g, '-') : ''; 
@@ -43,10 +47,24 @@ function formatProcessoParaTela(proc) {
     return proc ? proc.toString().replace(/-/g, '/') : ''; 
 }
 
+// Converte datas para o formato DD/MM/AAAA com barra
+function formatDateBR(dateStr) {
+    if (!dateStr) return '';
+    let limpo = dateStr.toString().replace(/-/g, '/');
+    let parts = limpo.split('/');
+    if (parts.length === 3) {
+        if (parts[0].length === 4) { // Formato AAAA/MM/DD
+            return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
+        }
+        return `${parts[0].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[2]}`;
+    }
+    return dateStr;
+}
+
 function parseDateBR(dateStr) {
     if(!dateStr) return null;
-    const separator = dateStr.includes('-') ? '-' : '/';
-    const parts = dateStr.split(separator);
+    const formatted = formatDateBR(dateStr);
+    const parts = formatted.split('/');
     if(parts.length !== 3) return null;
     return new Date(parts[2], parts[1] - 1, parts[0]);
 }
@@ -54,13 +72,20 @@ function parseDateBR(dateStr) {
 function calcularDias(dataEntradaStr) {
     const dataEnt = parseDateBR(dataEntradaStr);
     if(!dataEnt) return 0;
-    
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     dataEnt.setHours(0, 0, 0, 0);
+    return Math.floor(Math.abs(hoje - dataEnt) / (1000 * 60 * 60 * 24));
+}
 
-    const diffTime = Math.abs(hoje - dataEnt);
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+// Aplica máscara ao CTM: 00.000.0000
+function maskCTM(value) {
+    if (!value) return '';
+    let digits = value.toString().replace(/\D/g, '');
+    if (digits.length === 9) {
+        return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5)}`;
+    }
+    return value; // Retorna original se não tiver exatamente 9 dígitos numéricos puros
 }
 
 function normalizeCTM(ctm) {
@@ -93,7 +118,6 @@ const USER_MAPPING = {
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
     const usuario = document.getElementById('login-usuario').value;
     const pass = document.getElementById('login-password').value;
     const email = USER_MAPPING[usuario];
@@ -116,25 +140,15 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-document.getElementById('btn-logout').addEventListener('click', () => { 
-    signOut(auth); 
-    nav('login'); 
-});
-
+document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); nav('login'); });
 document.getElementById('btn-open-consulta').addEventListener('click', () => nav('consulta'));
-
-document.querySelectorAll('.btn-voltar-login').forEach(b => {
-    b.addEventListener('click', () => nav('login'));
-});
+document.querySelectorAll('.btn-voltar-login').forEach(b => b.addEventListener('click', () => nav('login')));
 
 onAuthStateChanged(auth, user => {
     if(user) { 
         let nomeUsuario = user.email;
         for (const [key, value] of Object.entries(USER_MAPPING)) {
-            if (value === user.email) {
-                nomeUsuario = key;
-                break;
-            }
+            if (value === user.email) { nomeUsuario = key; break; }
         }
         document.getElementById('user-info').innerText = `Usuário: ${nomeUsuario}`; 
         nav('dashboard'); 
@@ -160,9 +174,13 @@ function loadData() {
     });
 
     onValue(ref(db, 'Status'), snap => {
-        if(snap.exists()) {
-            configData.Status = snap.val();
-        }
+        if(snap.exists()) configData.Status = snap.val();
+        populateSelects();
+        renderConfigListsIfActive();
+    });
+
+    onValue(ref(db, 'Destinos'), snap => {
+        if(snap.exists()) configData.Destinos = snap.val();
         populateSelects();
         renderConfigListsIfActive();
     });
@@ -178,6 +196,8 @@ function loadData() {
             });
         }
         
+        populateDateMaskFilter();
+
         if(document.getElementById('tabela-geral-screen').classList.contains('active')) {
             renderTabelaGeral(false); 
         }
@@ -197,16 +217,47 @@ function populateSelects() {
     const arrAssuntos = configData.Assuntos || [];
     const arrFuncs = configData.Cadastradores || [];
     const arrStatus = configData.Status || [];
+    const arrDestinos = configData.Destinos || [];
     
     document.querySelectorAll('.dyn-assuntos').forEach(sel => {
+        let current = sel.value;
         sel.innerHTML = '<option value="">Selecione...</option>' + arrAssuntos.map(a => `<option value="${a}">${a}</option>`).join('');
+        sel.value = current;
     });
     document.querySelectorAll('.dyn-funcionarios').forEach(sel => {
+        let current = sel.value;
         sel.innerHTML = '<option value="">Selecione...</option>' + arrFuncs.map(a => `<option value="${a}">${a}</option>`).join('');
+        sel.value = current;
     });
     document.querySelectorAll('.dyn-status').forEach(sel => {
+        let current = sel.value;
         sel.innerHTML = '<option value="">Selecione...</option>' + arrStatus.map(a => `<option value="${a}">${a}</option>`).join('');
+        sel.value = current;
     });
+    document.querySelectorAll('.dyn-destinos').forEach(sel => {
+        let current = sel.value;
+        sel.innerHTML = '<option value="">Selecione...</option>' + arrDestinos.map(a => `<option value="${a}">${a}</option>`).join('');
+        sel.value = current;
+    });
+}
+
+function populateDateMaskFilter() {
+    const select = document.getElementById('col-filter-datamask');
+    if (!select) return;
+    let current = select.value;
+    let mesesAnosSet = new Set();
+    processosData.forEach(p => {
+        if (p['data status']) {
+            let dt = formatDateBR(p['data status']);
+            let parts = dt.split('/');
+            if (parts.length === 3) {
+                mesesAnosSet.add(`${parts[1]}/${parts[2]}`);
+            }
+        }
+    });
+    let options = Array.from(mesesAnosSet).sort().reverse();
+    select.innerHTML = '<option value="">Filtrar Mês/Ano (Data Status)...</option>' + options.map(m => `<option value="${m}">${m}</option>`).join('');
+    select.value = current;
 }
 
 // =========================================================================
@@ -215,9 +266,9 @@ function populateSelects() {
 function renderConfigLists() {
     const gerarHtml = (arr, chave) => {
         return (arr || []).map((item, idx) => `
-            <li class="flex justify-between items-center" style="padding: 8px 0; border-bottom: 1px solid var(--color-border);">
+            <li class="flex justify-between items-center" style="padding: 6px 0; border-bottom: 1px solid var(--color-border);">
                 <span>${item}</span>
-                <button class="btn btn--error btn--sm" onclick="removerConfigItem('${chave}', ${idx})" style="padding: 4px 8px; font-size: 10px; background: red; color: white; border: none;">Excluir</button>
+                <button class="btn btn--error btn--sm" onclick="removerConfigItem('${chave}', ${idx})" style="padding: 2px 6px; font-size: 10px; background: red; color: white; border: none;">Excluir</button>
             </li>
         `).join('');
     };
@@ -225,60 +276,60 @@ function renderConfigLists() {
     document.getElementById('lista-assuntos').innerHTML = gerarHtml(configData.Assuntos, 'Assuntos');
     document.getElementById('lista-funcionarios').innerHTML = gerarHtml(configData.Cadastradores, 'Cadastradores');
     document.getElementById('lista-status').innerHTML = gerarHtml(configData.Status, 'Status');
+    document.getElementById('lista-destinos').innerHTML = gerarHtml(configData.Destinos, 'Destinos');
 }
 
 window.addConfigItem = async function(chave, inputId) {
     const valor = document.getElementById(inputId).value.trim();
     if(!valor) return;
-    
     const novaLista = [...(configData[chave] || []), valor];
-    
     try {
         await set(ref(db, chave), novaLista);
         document.getElementById(inputId).value = '';
-    } catch(err) { 
-        alert("Erro ao salvar: " + err.message); 
-    }
+    } catch(err) { alert("Erro ao salvar: " + err.message); }
 }
 
 window.removerConfigItem = async function(chave, index) {
     if(!confirm('Tem certeza que deseja remover este item?')) return;
-    
     const novaLista = [...(configData[chave] || [])];
     novaLista.splice(index, 1);
-    
     try {
         await set(ref(db, chave), novaLista); 
-    } catch(err) { 
-        alert("Erro ao remover: " + err.message); 
-    }
+    } catch(err) { alert("Erro ao remover: " + err.message); }
 }
 
 // =========================================================================
-// TELA DE CADASTRO 
+// CADASTRO
 // =========================================================================
 document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
     const btnSalvar = e.target.querySelector('button[type="submit"]');
     btnSalvar.innerText = "Salvando...";
     btnSalvar.disabled = true;
 
-    const diasCalculados = calcularDias(document.getElementById('cad-entrada').value).toString();
+    const rawCtm = document.getElementById('cad-ctm').value;
+    const ctmMascarado = maskCTM(rawCtm);
+    const entradaFmt = formatDateBR(document.getElementById('cad-entrada').value);
+    const dataStatusFmt = formatDateBR(document.getElementById('cad-data-status').value);
+
+    const diasCalculados = calcularDias(entradaFmt).toString();
+    const diasStatusCalculados = calcularDias(dataStatusFmt).toString();
 
     const obj = {
-        "ctm": document.getElementById('cad-ctm').value,
+        "ctm": ctmMascarado,
         "Nº PROC": formatProcessoParaDB(document.getElementById('cad-processo').value),
         "assunto": document.getElementById('cad-assunto').value,
-        "entrada": document.getElementById('cad-entrada').value,
-        "Vistoria": document.getElementById('cad-vistoria').value,
+        "entrada": entradaFmt,
+        "Vistoria": formatDateBR(document.getElementById('cad-vistoria').value),
         "funcionários": document.getElementById('cad-funcionario').value,
-        "1ª VISITA": document.getElementById('cad-v1').value,
-        "2ª VISITA": document.getElementById('cad-v2').value,
-        "3ª VISITA": document.getElementById('cad-v3').value,
+        "1ª VISITA": formatDateBR(document.getElementById('cad-v1').value),
+        "2ª VISITA": formatDateBR(document.getElementById('cad-v2').value),
+        "3ª VISITA": formatDateBR(document.getElementById('cad-v3').value),
         "OBS": document.getElementById('cad-obs').value,
         "dias": diasCalculados,
-        "saída": document.getElementById('cad-saida').value,
+        "data status": dataStatusFmt,
+        "dias status": dataStatusFmt ? diasStatusCalculados : "0",
+        "saída": formatDateBR(document.getElementById('cad-saida').value),
         "destino": document.getElementById('cad-destino').value,
         "status": document.getElementById('cad-status').value
     };
@@ -296,7 +347,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 });
 
 // =========================================================================
-// PAGINAÇÃO E TABELA GERAL (Base, Edição, Pesquisa)
+// TABELA GERAL (Base, Edição, Pesquisa) COM ORDENAÇÃO E FILTROS DE COLUNA
 // =========================================================================
 function setupTabelaGeral(modo) {
     currentMode = modo;
@@ -308,16 +359,25 @@ function setupTabelaGeral(modo) {
     document.getElementById('titulo-tabela').innerText = titulos[modo];
     
     currentPage = 1; 
+    currentSortColumn = 'entrada'; // Ordenação padrão por entrada
+    currentSortDirection = 'desc';
+
     document.getElementById('filtro-ctm').value = '';
     document.getElementById('filtro-proc').value = '';
     document.getElementById('filtro-func').value = '';
     document.getElementById('filtro-assunto').value = '';
+    document.getElementById('col-filter-assunto').value = '';
+    document.getElementById('col-filter-func').value = '';
+    document.getElementById('col-filter-status').value = '';
+    document.getElementById('col-filter-destino').value = '';
+    document.getElementById('col-filter-datamask').value = '';
     
     renderTabelaGeral(true);
 }
 
-document.getElementById('btn-filtrar-geral').addEventListener('click', () => {
-    renderTabelaGeral(true);
+document.getElementById('btn-filtrar-geral').addEventListener('click', () => renderTabelaGeral(true));
+['col-filter-assunto', 'col-filter-func', 'col-filter-status', 'col-filter-destino', 'col-filter-datamask'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => renderTabelaGeral(true));
 });
 
 function renderTabelaGeral(resetPage = false) {
@@ -328,9 +388,14 @@ function renderTabelaGeral(resetPage = false) {
     const fFunc = document.getElementById('filtro-func').value;
     const fAss = document.getElementById('filtro-assunto').value;
 
+    const colAss = document.getElementById('col-filter-assunto').value;
+    const colFunc = document.getElementById('col-filter-func').value;
+    const colStatus = document.getElementById('col-filter-status').value;
+    const colDest = document.getElementById('col-filter-destino').value;
+    const colDataMask = document.getElementById('col-filter-datamask').value;
+
     filteredList = processosData.filter(p => {
         let match = true;
-        
         const pCtm = normalizeCTM(p.ctm);
         const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
 
@@ -338,17 +403,52 @@ function renderTabelaGeral(resetPage = false) {
         if(fProc && !pProc.includes(fProc)) match = false;
         if(fFunc && p['funcionários'] !== fFunc) match = false;
         if(fAss && p.assunto !== fAss) match = false;
+
+        if(colAss && p.assunto !== colAss) match = false;
+        if(colFunc && p['funcionários'] !== colFunc) match = false;
+        if(colStatus && p.status !== colStatus) match = false;
+        if(colDest && p.destino !== colDest) match = false;
+        if(colDataMask) {
+            let dt = formatDateBR(p['data status']);
+            if (!dt || !dt.endsWith(colDataMask)) match = false;
+        }
         return match;
     });
 
-    // Ordenar da data de entrada mais recente para a mais antiga
-    filteredList.sort((a, b) => {
-        const dateA = parseDateBR(a.entrada) || new Date(0);
-        const dateB = parseDateBR(b.entrada) || new Date(0);
-        return dateB - dateA;
-    });
+    // Ordenação por colunas clicáveis
+    if (currentSortColumn) {
+        filteredList.sort((a, b) => {
+            let valA = a[currentSortColumn] || '';
+            let valB = b[currentSortColumn] || '';
+            
+            if (currentSortColumn.includes('data') || currentSortColumn === 'entrada' || currentSortColumn === 'Vistoria') {
+                valA = parseDateBR(valA) || new Date(0);
+                valB = parseDateBR(valB) || new Date(0);
+            } else if (currentSortColumn === 'dias' || currentSortColumn === 'dias status') {
+                valA = parseInt(valA) || 0;
+                valB = parseInt(valB) || 0;
+            } else {
+                valA = valA.toString().toLowerCase();
+                valB = valB.toString().toLowerCase();
+            }
+
+            if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
+            if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
 
     renderPaginaAtual();
+}
+
+window.ordenarColuna = function(colName) {
+    if (currentSortColumn === colName) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = colName;
+        currentSortDirection = 'asc';
+    }
+    renderTabelaGeral(false);
 }
 
 function renderPaginaAtual() {
@@ -362,50 +462,85 @@ function renderPaginaAtual() {
     if(currentPage < 1) currentPage = 1;
 
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    
-    const paginatedItems = filteredList.slice(startIndex, endIndex);
+    const paginatedItems = filteredList.slice(startIndex, startIndex + itemsPerPage);
+
+    const sortIndicator = (col) => currentSortColumn === col ? (currentSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
 
     if(currentMode === 'edicao') {
-        thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Funcionários</th><th>Ações</th>`;
+        thead.innerHTML = `
+            <th onclick="ordenarColuna('ctm')" style="cursor:pointer">CTM${sortIndicator('ctm')}</th>
+            <th onclick="ordenarColuna('Nº PROC')" style="cursor:pointer">Nº Processo${sortIndicator('Nº PROC')}</th>
+            <th onclick="ordenarColuna('assunto')" style="cursor:pointer">Assunto${sortIndicator('assunto')}</th>
+            <th onclick="ordenarColuna('entrada')" style="cursor:pointer">Entrada${sortIndicator('entrada')}</th>
+            <th onclick="ordenarColuna('funcionários')" style="cursor:pointer">Funcionários${sortIndicator('funcionários')}</th>
+            <th>Ações</th>`;
     } else if(currentMode === 'pesquisa') {
-        thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Dias</th><th>Funcionário</th><th>Status</th><th>Detalhes</th>`;
-    } else {
-        thead.innerHTML = `<th>CTM</th><th>Nº Processo</th><th>Assunto</th><th>Entrada</th><th>Dias</th><th>Funcionário</th><th>Status</th><th>Ações</th>`;
+        thead.innerHTML = `
+            <th onclick="ordenarColuna('ctm')" style="cursor:pointer">CTM${sortIndicator('ctm')}</th>
+            <th onclick="ordenarColuna('Nº PROC')" style="cursor:pointer">Nº Processo${sortIndicator('Nº PROC')}</th>
+            <th onclick="ordenarColuna('assunto')" style="cursor:pointer">Assunto${sortIndicator('assunto')}</th>
+            <th onclick="ordenarColuna('entrada')" style="cursor:pointer">Entrada${sortIndicator('entrada')}</th>
+            <th onclick="ordenarColuna('dias')" style="cursor:pointer">Dias${sortIndicator('dias')}</th>
+            <th onclick="ordenarColuna('funcionários')" style="cursor:pointer">Funcionário${sortIndicator('funcionários')}</th>
+            <th onclick="ordenarColuna('status')" style="cursor:pointer">Status${sortIndicator('status')}</th>
+            <th onclick="ordenarColuna('data status')" style="cursor:pointer">Data Status${sortIndicator('data status')}</th>
+            <th onclick="ordenarColuna('dias status')" style="cursor:pointer">Dias Status${sortIndicator('dias status')}</th>
+            <th onclick="ordenarColuna('destino')" style="cursor:pointer">Destino${sortIndicator('destino')}</th>
+            <th>Detalhes</th>`;
+    } else { // base
+        thead.innerHTML = `
+            <th onclick="ordenarColuna('ctm')" style="cursor:pointer">CTM${sortIndicator('ctm')}</th>
+            <th onclick="ordenarColuna('Nº PROC')" style="cursor:pointer">Nº Processo${sortIndicator('Nº PROC')}</th>
+            <th onclick="ordenarColuna('assunto')" style="cursor:pointer">Assunto${sortIndicator('assunto')}</th>
+            <th onclick="ordenarColuna('entrada')" style="cursor:pointer">Entrada${sortIndicator('entrada')}</th>
+            <th onclick="ordenarColuna('dias')" style="cursor:pointer">Dias${sortIndicator('dias')}</th>
+            <th onclick="ordenarColuna('funcionários')" style="cursor:pointer">Funcionário${sortIndicator('funcionários')}</th>
+            <th onclick="ordenarColuna('status')" style="cursor:pointer">Status${sortIndicator('status')}</th>
+            <th onclick="ordenarColuna('data status')" style="cursor:pointer">Data Status${sortIndicator('data status')}</th>
+            <th onclick="ordenarColuna('dias status')" style="cursor:pointer">Dias Status${sortIndicator('dias status')}</th>
+            <th onclick="ordenarColuna('destino')" style="cursor:pointer">Destino${sortIndicator('destino')}</th>
+            <th>Ações</th>`;
     }
 
     tbody.innerHTML = paginatedItems.map(p => {
         let dias = calcularDias(p.entrada);
+        let diasStatus = p['data status'] ? calcularDias(p['data status']) : 0;
         let tr = '';
         
         if(currentMode === 'edicao') {
-            tr = `<td>${p.ctm||''}</td>
+            tr = `<td>${maskCTM(p.ctm)||''}</td>
                   <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
-                  <td>${p.entrada||''}</td>
+                  <td>${formatDateBR(p.entrada)||''}</td>
                   <td>${p['funcionários']||''}</td>
                   <td><button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button></td>`;
         } else if (currentMode === 'pesquisa') {
-             tr = `<td>${p.ctm||''}</td>
+             tr = `<td>${maskCTM(p.ctm)||''}</td>
                   <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
-                  <td>${p.entrada||''}</td>
+                  <td>${formatDateBR(p.entrada)||''}</td>
                   <td>${dias}</td>
                   <td>${p['funcionários']||''}</td>
                   <td>${p.status||''}</td>
+                  <td>${formatDateBR(p['data status'])||''}</td>
+                  <td>${diasStatus}</td>
+                  <td>${p.destino||''}</td>
                   <td>${p['OBS']||''}</td>`;
         } else {
             let acoes = `
                 <button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button> 
                 <button class="btn btn--error btn--sm" style="background:red; color:white; border:none;" onclick="deletarProcesso('${p.id}')">Excluir</button>`;
             
-            tr = `<td>${p.ctm||''}</td>
+            tr = `<td>${maskCTM(p.ctm)||''}</td>
                   <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
-                  <td>${p.entrada||''}</td>
+                  <td>${formatDateBR(p.entrada)||''}</td>
                   <td>${dias}</td>
                   <td>${p['funcionários']||''}</td>
                   <td>${p.status||''}</td>
+                  <td>${formatDateBR(p['data status'])||''}</td>
+                  <td>${diasStatus}</td>
+                  <td>${p.destino||''}</td>
                   <td>${acoes}</td>`;
         }
         return `<tr>${tr}</tr>`;
@@ -419,10 +554,8 @@ function renderPaginaAtual() {
 window.mudarPagina = function(direction) {
     const totalPages = Math.ceil(filteredList.length / itemsPerPage) || 1;
     currentPage += direction;
-    
     if (currentPage < 1) currentPage = 1;
     if (currentPage > totalPages) currentPage = totalPages;
-    
     renderPaginaAtual();
 }
 
@@ -438,21 +571,23 @@ window.abrirEdicao = function(id) {
     const selAssuntos = configData.Assuntos.map(a => `<option value="${a}" ${p.assunto === a ? 'selected' : ''}>${a}</option>`).join('');
     const selFuncs = configData.Cadastradores.map(a => `<option value="${a}" ${p['funcionários'] === a ? 'selected' : ''}>${a}</option>`).join('');
     const selStatus = configData.Status.map(a => `<option value="${a}" ${p.status === a ? 'selected' : ''}>${a}</option>`).join('');
+    const selDestinos = (configData.Destinos || []).map(a => `<option value="${a}" ${p.destino === a ? 'selected' : ''}>${a}</option>`).join('');
 
     body.innerHTML = `
         <div class="filters-row">
-            <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${p.ctm||''}"></div>
+            <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${maskCTM(p.ctm)||''}"></div>
             <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC']||'')}"></div>
             <div class="form-group"><label>Assunto</label><select id="edit-assunto" class="form-control"><option value="">Selecione...</option>${selAssuntos}</select></div>
-            <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${p.entrada||''}"></div>
+            <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${formatDateBR(p.entrada)||''}"></div>
             <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
             <div class="form-group"><label>Status</label><select id="edit-status" class="form-control"><option value="">Selecione...</option>${selStatus}</select></div>
-            <div class="form-group"><label>Vistoria</label><input type="text" id="edit-vist" class="form-control" value="${p['Vistoria']||''}"></div>
-            <div class="form-group"><label>1ª Vist</label><input type="text" id="edit-v1" class="form-control" value="${p['1ª VISITA']||''}"></div>
-            <div class="form-group"><label>2ª Vist</label><input type="text" id="edit-v2" class="form-control" value="${p['2ª VISITA']||''}"></div>
-            <div class="form-group"><label>3ª Vist</label><input type="text" id="edit-v3" class="form-control" value="${p['3ª VISITA']||''}"></div>
-            <div class="form-group"><label>Data Saída</label><input type="text" id="edit-saida" class="form-control" value="${p['saída']||''}"></div>
-            <div class="form-group"><label>Destino</label><input type="text" id="edit-destino" class="form-control" value="${p.destino||''}"></div>
+            <div class="form-group"><label>Data Status</label><input type="text" id="edit-data-status" class="form-control" value="${formatDateBR(p['data status'])||''}"></div>
+            <div class="form-group"><label>Vistoria</label><input type="text" id="edit-vist" class="form-control" value="${formatDateBR(p['Vistoria'])||''}"></div>
+            <div class="form-group"><label>1ª Vist</label><input type="text" id="edit-v1" class="form-control" value="${formatDateBR(p['1ª VISITA'])||''}"></div>
+            <div class="form-group"><label>2ª Vist</label><input type="text" id="edit-v2" class="form-control" value="${formatDateBR(p['2ª VISITA'])||''}"></div>
+            <div class="form-group"><label>3ª Vist</label><input type="text" id="edit-v3" class="form-control" value="${formatDateBR(p['3ª VISITA'])||''}"></div>
+            <div class="form-group"><label>Data Saída</label><input type="text" id="edit-saida" class="form-control" value="${formatDateBR(p['saída'])||''}"></div>
+            <div class="form-group"><label>Destino</label><select id="edit-destino" class="form-control"><option value="">Selecione...</option>${selDestinos}</select></div>
         </div>
         <div class="form-group mt-8">
             <label>Observação</label>
@@ -465,20 +600,25 @@ window.abrirEdicao = function(id) {
         const btnSalvar = document.getElementById('btn-salvar-edicao');
         btnSalvar.innerText = "Salvando...";
         
-        const diasCalculados = calcularDias(document.getElementById('edit-entrada').value).toString();
+        const entradaFmt = formatDateBR(document.getElementById('edit-entrada').value);
+        const dataStatusFmt = formatDateBR(document.getElementById('edit-data-status').value);
+        const diasCalculados = calcularDias(entradaFmt).toString();
+        const diasStatusCalculados = calcularDias(dataStatusFmt).toString();
 
         await update(ref(db, 'processos/' + id), {
-            "ctm": document.getElementById('edit-ctm').value,
+            "ctm": maskCTM(document.getElementById('edit-ctm').value),
             "Nº PROC": formatProcessoParaDB(document.getElementById('edit-proc').value),
             "assunto": document.getElementById('edit-assunto').value,
-            "entrada": document.getElementById('edit-entrada').value,
+            "entrada": entradaFmt,
             "funcionários": document.getElementById('edit-func').value,
             "status": document.getElementById('edit-status').value,
-            "Vistoria": document.getElementById('edit-vist').value,
-            "1ª VISITA": document.getElementById('edit-v1').value,
-            "2ª VISITA": document.getElementById('edit-v2').value,
-            "3ª VISITA": document.getElementById('edit-v3').value,
-            "saída": document.getElementById('edit-saida').value,
+            "data status": dataStatusFmt,
+            "dias status": dataStatusFmt ? diasStatusCalculados : "0",
+            "Vistoria": formatDateBR(document.getElementById('edit-vist').value),
+            "1ª VISITA": formatDateBR(document.getElementById('edit-v1').value),
+            "2ª VISITA": formatDateBR(document.getElementById('edit-v2').value),
+            "3ª VISITA": formatDateBR(document.getElementById('edit-v3').value),
+            "saída": formatDateBR(document.getElementById('edit-saida').value),
             "destino": document.getElementById('edit-destino').value,
             "OBS": document.getElementById('edit-obs').value,
             "dias": diasCalculados
@@ -496,43 +636,45 @@ window.deletarProcesso = async function(id) {
 }
 
 // =========================================================================
-// CONSULTA PÚBLICA (TELA INICIAL)
+// CONSULTA PÚBLICA
 // =========================================================================
 document.getElementById('btn-consultar-publico').addEventListener('click', () => {
     const fCtm = normalizeCTM(document.getElementById('consulta-ctm').value);
     const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value).toLowerCase().trim();
-    
     const tbody = document.getElementById('tbody-consulta-publica');
     
-    if(!fCtm && !fProc) {
-        alert("Preencha CTM ou Processo para consultar.");
-        return;
-    }
+    if(!fCtm && !fProc) { alert("Preencha CTM ou Processo para consultar."); return; }
 
     const res = processosData.filter(p => {
         let match = false;
         const pCtm = normalizeCTM(p.ctm);
         const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
-
         if(fCtm && pCtm.includes(fCtm)) match = true;
         if(fProc && pProc.includes(fProc)) match = true;
         return match;
     });
 
     if(res.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center">Nenhum processo encontrado.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center">Nenhum processo encontrado.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = res.map(p => `<tr>
-        <td>${p.ctm||''}</td>
-        <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
-        <td>${p.assunto||''}</td>
-        <td>${p.entrada||''}</td>
-        <td>${p['funcionários']||''}</td>
-        <td>${p.status||''}</td>
-        <td><div style="max-width:200px; white-space:normal; word-wrap:break-word;">${p['OBS']||''}</div></td>
-    </tr>`).join('');
+    tbody.innerHTML = res.map(p => {
+        let dias = calcularDias(p.entrada);
+        let diasStatus = p['data status'] ? calcularDias(p['data status']) : 0;
+        return `<tr>
+            <td>${maskCTM(p.ctm)||''}</td>
+            <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
+            <td>${p.assunto||''}</td>
+            <td>${formatDateBR(p.entrada)||''}</td>
+            <td>${p['funcionários']||''}</td>
+            <td>${p.status||''}</td>
+            <td>${formatDateBR(p['data status'])||''}</td>
+            <td>${diasStatus}</td>
+            <td>${p.destino||''}</td>
+            <td><div style="max-width:200px; white-space:normal; word-wrap:break-word;">${p['OBS']||''}</div></td>
+        </tr>`;
+    }).join('');
 });
 
 // =========================================================================
@@ -552,7 +694,6 @@ function renderStats() {
     let concluidos = 0;
     let concluidosMes = 0;
     
-    // Arrays para guardar o total geral do SETOR (para todos os funcionários)
     let totalSetorAssuntoMes = {};
     let totalSetorAssuntoAno = {};
 
@@ -566,7 +707,6 @@ function renderStats() {
         if(isConcl) concluidos++;
         if(isConcl && isMes) concluidosMes++;
         
-        // Povoando total do setor
         if(!totalSetorAssuntoMes[p.assunto]) totalSetorAssuntoMes[p.assunto] = 0;
         if(!totalSetorAssuntoAno[p.assunto]) totalSetorAssuntoAno[p.assunto] = 0;
         
@@ -611,7 +751,6 @@ function renderStats() {
                 let v = assuntosMap[k];
                 let sMes = totalSetorAssuntoMes[k] || 0;
                 let sAno = totalSetorAssuntoAno[k] || 0;
-                
                 let pMes = sMes > 0 ? ((v.mes / sMes) * 100).toFixed(1) + '%' : '0%';
                 let pAno = sAno > 0 ? ((v.ano / sAno) * 100).toFixed(1) + '%' : '0%';
                 
@@ -625,49 +764,21 @@ function renderStats() {
                 totais.cAno += v.cAno;
                 
                 html += `<tr>
-                    <td>${k}</td>
-                    <td>${v.qtd}</td>
-                    <td>${v.mes}</td>
-                    <td>${v.ano}</td>
-                    <td>${sMes}</td>
-                    <td>${pMes}</td>
-                    <td>${sAno}</td>
-                    <td>${pAno}</td>
-                    <td>${v.cTotal}</td>
-                    <td>${v.cMes}</td>
-                    <td>${v.cAno}</td>
+                    <td>${k}</td><td>${v.qtd}</td><td>${v.mes}</td><td>${v.ano}</td>
+                    <td>${sMes}</td><td>${pMes}</td><td>${sAno}</td><td>${pAno}</td>
+                    <td>${v.cTotal}</td><td>${v.cMes}</td><td>${v.cAno}</td>
                 </tr>`;
             }
         });
         
-        // Linha com a soma total
         html += `<tr style="font-weight: bold; background-color: var(--color-bg-2);">
-            <td>TOTAL</td>
-            <td>${totais.qtd}</td>
-            <td>${totais.mes}</td>
-            <td>${totais.ano}</td>
-            <td>${totais.setorMes}</td>
-            <td>-</td>
-            <td>${totais.setorAno}</td>
-            <td>-</td>
-            <td>${totais.cTotal}</td>
-            <td>${totais.cMes}</td>
-            <td>${totais.cAno}</td>
+            <td>TOTAL</td><td>${totais.qtd}</td><td>${totais.mes}</td><td>${totais.ano}</td>
+            <td>${totais.setorMes}</td><td>-</td><td>${totais.setorAno}</td><td>-</td>
+            <td>${totais.cTotal}</td><td>${totais.cMes}</td><td>${totais.cAno}</td>
         </tr>`;
 
-        // Repete o cabeçalho no rodapé da tabela
         html += `<tr style="background: var(--color-bg-3); color: var(--color-primary); font-weight: bold;">
-            <th>Assunto</th>
-            <th>QTD</th>
-            <th>Mensal</th>
-            <th>Anual</th>
-            <th>Total Setor Mês</th>
-            <th>% Mês</th>
-            <th>Total Setor Ano</th>
-            <th>% Ano</th>
-            <th>Concluídos</th>
-            <th>Concl. Mês</th>
-            <th>Concl. Ano</th>
+            <th>Assunto</th><th>QTD</th><th>Mensal</th><th>Anual</th><th>Total Setor Mês</th><th>% Mês</th><th>Total Setor Ano</th><th>% Ano</th><th>Concluídos</th><th>Concl. Mês</th><th>Concl. Ano</th>
         </tr>`;
         
         tbody.innerHTML = html;
@@ -697,7 +808,7 @@ function renderCharts(mes, ano) {
         if(isMes && p['funcionários']) {
             funcCount[p['funcionários']] = (funcCount[p['funcionários']]||0) + 1;
         }
-        // Gráfico 3: Apenas Concluídos filtrados pelo MÊS atual
+        // Gráfico 3: Top 6 funcionários mensais filtrados por status Concluído no mês atual
         if(isMes && p.status === 'Concluído' && p['funcionários']) {
             funcConclCount[p['funcionários']] = (funcConclCount[p['funcionários']]||0) + 1;
         }
@@ -712,29 +823,18 @@ function renderCharts(mes, ano) {
     const createChart = (id, label, dataArr, color) => {
         const canvas = document.getElementById(id);
         if(!canvas) return; 
-        
         const ctx = canvas.getContext('2d');
         charts.push(new Chart(ctx, {
             type: 'bar',
             data: { 
                 labels: dataArr.map(d => d[0]), 
-                datasets: [{ 
-                    label: label, 
-                    data: dataArr.map(d => d[1]), 
-                    backgroundColor: color 
-                }] 
+                datasets: [{ label: label, data: dataArr.map(d => d[1]), backgroundColor: color }] 
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                scales: { 
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } } 
-                } 
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
         }));
     };
 
     createChart('chart1', 'Top Assuntos (Mês)', topAssuntos, '#32b8c6');
-    createChart('chart2', 'Entradas por Funcionário', topFuncs, '#e68161');
+    createChart('chart2', 'Entradas por Funcionário (Mês)', topFuncs, '#e68161');
     createChart('chart3', 'Concluídos por Funcionário (Mês)', topFuncsConcl, '#22c55e');
 }
