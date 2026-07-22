@@ -22,7 +22,7 @@ const auth = getAuth(app);
 // =========================================================================
 // VARIÁVEIS GLOBAIS
 // =========================================================================
-let configData = { Assuntos: [], Cadastradores: [], Status: ["Em andamento", "Concluído", "Parado"] };
+let configData = { Assuntos: [], Cadastradores: [], Status: ["Concluído", "Em andamento", "Parado"] };
 let processosData = [];
 let currentMode = ''; // 'edicao', 'pesquisa', 'base'
 let charts = [];
@@ -36,16 +36,15 @@ let filteredList = [];
 // UTILITÁRIOS
 // =========================================================================
 function formatProcessoParaDB(proc) { 
-    return proc ? proc.replace(/\//g, '-') : ''; 
+    return proc ? proc.toString().replace(/\//g, '-') : ''; 
 }
 
 function formatProcessoParaTela(proc) { 
-    return proc ? proc.replace(/-/g, '/') : ''; 
+    return proc ? proc.toString().replace(/-/g, '/') : ''; 
 }
 
 function parseDateBR(dateStr) {
     if(!dateStr) return null;
-    // O JSON original possui data com hífen (05-04-2021). O sistema converte tanto hífen quanto barra.
     const separator = dateStr.includes('-') ? '-' : '/';
     const parts = dateStr.split(separator);
     if(parts.length !== 3) return null;
@@ -56,7 +55,6 @@ function calcularDias(dataEntradaStr) {
     const dataEnt = parseDateBR(dataEntradaStr);
     if(!dataEnt) return 0;
     
-    // Zera as horas para calcular apenas os dias corridos
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     dataEnt.setHours(0, 0, 0, 0);
@@ -121,35 +119,43 @@ onAuthStateChanged(auth, user => {
 });
 
 // =========================================================================
-// CARREGAMENTO DE DADOS (REALTIME)
+// CARREGAMENTO DE DADOS (REALTIME) - DIRETO DA RAIZ
 // =========================================================================
 function loadData() {
-    // Carrega as configurações (listas de Assuntos, Cadastradores, Status)
-    onValue(ref(db, 'config'), snap => {
-        if(snap.exists()) {
-            configData = { ...configData, ...snap.val() };
-            populateSelects();
-            if(document.getElementById('configuracoes-screen').classList.contains('active')){
-                renderConfigLists();
-            }
-        }
+    // 1. Carrega Assuntos
+    onValue(ref(db, 'Assuntos'), snap => {
+        configData.Assuntos = snap.exists() ? snap.val() : [];
+        populateSelects();
+        renderConfigListsIfActive();
     });
 
-    // Carrega os processos do nó JSON correspondente
+    // 2. Carrega Cadastradores (Funcionários)
+    onValue(ref(db, 'Cadastradores'), snap => {
+        configData.Cadastradores = snap.exists() ? snap.val() : [];
+        populateSelects();
+        renderConfigListsIfActive();
+    });
+
+    // 3. Carrega Status
+    onValue(ref(db, 'Status'), snap => {
+        if(snap.exists()) {
+            configData.Status = snap.val();
+        }
+        populateSelects();
+        renderConfigListsIfActive();
+    });
+
+    // 4. Carrega Processos
     onValue(ref(db, 'processos'), snap => {
         processosData = [];
         if(snap.exists()) {
-            // Verifica se os dados vieram como Array ou como Objeto
             const data = snap.val();
-            if (Array.isArray(data)) {
-                data.forEach((val, index) => { 
-                    if(val) processosData.push({ id: index.toString(), ...val }); 
-                });
-            } else {
-                Object.keys(data).forEach(key => {
+            // Lida com arrays (JSON importado) ou objetos padrão do Firebase
+            Object.keys(data).forEach(key => {
+                if(data[key]) {
                     processosData.push({ id: key, ...data[key] });
-                });
-            }
+                }
+            });
         }
         
         if(document.getElementById('tabela-geral-screen').classList.contains('active')) {
@@ -159,6 +165,12 @@ function loadData() {
             renderStats();
         }
     });
+}
+
+function renderConfigListsIfActive() {
+    if(document.getElementById('configuracoes-screen').classList.contains('active')){
+        renderConfigLists();
+    }
 }
 
 function populateSelects() {
@@ -178,7 +190,7 @@ function populateSelects() {
 }
 
 // =========================================================================
-// CONFIGURAÇÕES (Adicionar/Remover itens das listas)
+// CONFIGURAÇÕES (Adicionar/Remover itens direto na raiz)
 // =========================================================================
 function renderConfigLists() {
     const gerarHtml = (arr, chave) => {
@@ -202,7 +214,7 @@ window.addConfigItem = async function(chave, inputId) {
     const novaLista = [...(configData[chave] || []), valor];
     
     try {
-        await set(ref(db, 'config/' + chave), novaLista);
+        await set(ref(db, chave), novaLista); // Salva na raiz (ex: /Assuntos)
         document.getElementById(inputId).value = '';
     } catch(err) { 
         alert("Erro ao salvar: " + err.message); 
@@ -216,14 +228,14 @@ window.removerConfigItem = async function(chave, index) {
     novaLista.splice(index, 1);
     
     try {
-        await set(ref(db, 'config/' + chave), novaLista);
+        await set(ref(db, chave), novaLista); // Remove da raiz
     } catch(err) { 
         alert("Erro ao remover: " + err.message); 
     }
 }
 
 // =========================================================================
-// TELA DE CADASTRO
+// TELA DE CADASTRO (Mapeamento EXATO do JSON fornecido)
 // =========================================================================
 document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -232,16 +244,15 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
     btnSalvar.innerText = "Salvando...";
     btnSalvar.disabled = true;
 
-    // Respeitando as nomenclaturas EXATAS solicitadas para a base de dados
     const diasCalculados = calcularDias(document.getElementById('cad-entrada').value).toString();
 
     const obj = {
         "ctm": document.getElementById('cad-ctm').value,
-        "Nº PROC": formatProcessoParaDB(document.getElementById('Nº PROC').value),
+        "Nº PROC.": formatProcessoParaDB(document.getElementById('cad-processo').value),
         "assunto": document.getElementById('cad-assunto').value,
         "entrada": document.getElementById('cad-entrada').value,
         "Vistoria": document.getElementById('cad-vistoria').value,
-        "funcionários": document.getElementById('cad-funcionários').value,
+        "funcionários": document.getElementById('cad-funcionario').value, // <-- Chave do JSON
         "1ª VISITA": document.getElementById('cad-v1').value,
         "2ª VISITA": document.getElementById('cad-v2').value,
         "3ª VISITA": document.getElementById('cad-v3').value,
@@ -292,15 +303,19 @@ document.getElementById('btn-filtrar-geral').addEventListener('click', () => {
 function renderTabelaGeral(resetPage = false) {
     if(resetPage) currentPage = 1;
 
-    const fCtm = document.getElementById('filtro-ctm').value.toLowerCase();
-    const fProc = formatProcessoParaDB(document.getElementById('filtro-proc').value.toLowerCase());
+    const fCtm = document.getElementById('filtro-ctm').value.toLowerCase().trim();
+    const fProc = formatProcessoParaDB(document.getElementById('filtro-proc').value).toLowerCase().trim();
     const fFunc = document.getElementById('filtro-func').value;
     const fAss = document.getElementById('filtro-assunto').value;
 
     filteredList = processosData.filter(p => {
         let match = true;
-        if(fCtm && !(p.ctm || '').toLowerCase().includes(fCtm)) match = false;
-        if(fProc && !(p['Nº PROC'] || '').toLowerCase().includes(fProc)) match = false;
+        
+        const pCtm = (p.ctm || '').toString().toLowerCase();
+        const pProc = (p['Nº PROC.'] || '').toString().toLowerCase();
+
+        if(fCtm && !pCtm.includes(fCtm)) match = false;
+        if(fProc && !pProc.includes(fProc)) match = false;
         if(fFunc && p['funcionários'] !== fFunc) match = false;
         if(fAss && p.assunto !== fAss) match = false;
         return match;
@@ -338,13 +353,13 @@ function renderPaginaAtual() {
         
         if(currentMode === 'edicao') {
             tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p['funcionários']||''}</td>
                   <td><button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button></td>`;
         } else if (currentMode === 'pesquisa') {
              tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p.entrada||''}</td>
                   <td>${dias}</td>
@@ -357,7 +372,7 @@ function renderPaginaAtual() {
                 <button class="btn btn--error btn--sm" style="background:red; color:white; border:none;" onclick="deletarProcesso('${p.id}')">Excluir</button>`;
             
             tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p.entrada||''}</td>
                   <td>${dias}</td>
@@ -399,7 +414,7 @@ window.abrirEdicao = function(id) {
     body.innerHTML = `
         <div class="filters-row">
             <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${p.ctm||''}"></div>
-            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC']||'')}"></div>
+            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC.']||'')}"></div>
             <div class="form-group"><label>Assunto</label><select id="edit-assunto" class="form-control"><option value="">Selecione...</option>${selAssuntos}</select></div>
             <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${p.entrada||''}"></div>
             <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
@@ -422,9 +437,11 @@ window.abrirEdicao = function(id) {
         const btnSalvar = document.getElementById('btn-salvar-edicao');
         btnSalvar.innerText = "Salvando...";
         
+        const diasCalculados = calcularDias(document.getElementById('edit-entrada').value).toString();
+
         await update(ref(db, 'processos/' + id), {
             "ctm": document.getElementById('edit-ctm').value,
-            "Nº PROC": formatProcessoParaDB(document.getElementById('edit-proc').value),
+            "Nº PROC.": formatProcessoParaDB(document.getElementById('edit-proc').value),
             "assunto": document.getElementById('edit-assunto').value,
             "entrada": document.getElementById('edit-entrada').value,
             "funcionários": document.getElementById('edit-func').value,
@@ -435,7 +452,8 @@ window.abrirEdicao = function(id) {
             "3ª VISITA": document.getElementById('edit-v3').value,
             "saída": document.getElementById('edit-saida').value,
             "destino": document.getElementById('edit-destino').value,
-            "OBS": document.getElementById('edit-obs').value
+            "OBS": document.getElementById('edit-obs').value,
+            "dias": diasCalculados
         });
         
         btnSalvar.innerText = "Salvar Edição";
@@ -454,7 +472,7 @@ window.deletarProcesso = async function(id) {
 // =========================================================================
 document.getElementById('btn-consultar-publico').addEventListener('click', () => {
     const fCtm = document.getElementById('consulta-ctm').value.toLowerCase().trim();
-    const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value.toLowerCase().trim());
+    const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value).toLowerCase().trim();
     
     const tbody = document.getElementById('tbody-consulta-publica');
     
@@ -465,8 +483,11 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
 
     const res = processosData.filter(p => {
         let match = false;
-        if(fCtm && (p.ctm || '').toLowerCase().includes(fCtm)) match = true;
-        if(fProc && (p['Nº PROC'] || '').toLowerCase().includes(fProc)) match = true;
+        const pCtm = (p.ctm || '').toString().toLowerCase();
+        const pProc = (p['Nº PROC.'] || '').toString().toLowerCase();
+
+        if(fCtm && pCtm.includes(fCtm)) match = true;
+        if(fProc && pProc.includes(fProc)) match = true;
         return match;
     });
 
@@ -477,7 +498,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
 
     tbody.innerHTML = res.map(p => `<tr>
         <td>${p.ctm||''}</td>
-        <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
+        <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
         <td>${p.assunto||''}</td>
         <td>${p.entrada||''}</td>
         <td>${p['funcionários']||''}</td>
