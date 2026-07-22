@@ -248,11 +248,11 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 
     const obj = {
         "ctm": document.getElementById('cad-ctm').value,
-        "Nº PROC.": formatProcessoParaDB(document.getElementById('cad-processo').value),
+        "Nº PROC": formatProcessoParaDB(document.getElementById('cad-processo').value),
         "assunto": document.getElementById('cad-assunto').value,
         "entrada": document.getElementById('cad-entrada').value,
         "Vistoria": document.getElementById('cad-vistoria').value,
-        "funcionários": document.getElementById('cad-funcionario').value, // <-- Chave do JSON
+        "funcionários": document.getElementById('cad-funcionario').value,
         "1ª VISITA": document.getElementById('cad-v1').value,
         "2ª VISITA": document.getElementById('cad-v2').value,
         "3ª VISITA": document.getElementById('cad-v3').value,
@@ -312,7 +312,7 @@ function renderTabelaGeral(resetPage = false) {
         let match = true;
         
         const pCtm = (p.ctm || '').toString().toLowerCase();
-        const pProc = (p['Nº PROC.'] || '').toString().toLowerCase();
+        const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
 
         if(fCtm && !pCtm.includes(fCtm)) match = false;
         if(fProc && !pProc.includes(fProc)) match = false;
@@ -353,13 +353,13 @@ function renderPaginaAtual() {
         
         if(currentMode === 'edicao') {
             tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p['funcionários']||''}</td>
                   <td><button class="btn btn--warning btn--sm" onclick="abrirEdicao('${p.id}')">Editar</button></td>`;
         } else if (currentMode === 'pesquisa') {
              tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p.entrada||''}</td>
                   <td>${dias}</td>
@@ -372,7 +372,7 @@ function renderPaginaAtual() {
                 <button class="btn btn--error btn--sm" style="background:red; color:white; border:none;" onclick="deletarProcesso('${p.id}')">Excluir</button>`;
             
             tr = `<td>${p.ctm||''}</td>
-                  <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+                  <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
                   <td>${p.assunto||''}</td>
                   <td>${p.entrada||''}</td>
                   <td>${dias}</td>
@@ -414,7 +414,7 @@ window.abrirEdicao = function(id) {
     body.innerHTML = `
         <div class="filters-row">
             <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${p.ctm||''}"></div>
-            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC.']||'')}"></div>
+            <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC']||'')}"></div>
             <div class="form-group"><label>Assunto</label><select id="edit-assunto" class="form-control"><option value="">Selecione...</option>${selAssuntos}</select></div>
             <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${p.entrada||''}"></div>
             <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
@@ -441,7 +441,7 @@ window.abrirEdicao = function(id) {
 
         await update(ref(db, 'processos/' + id), {
             "ctm": document.getElementById('edit-ctm').value,
-            "Nº PROC.": formatProcessoParaDB(document.getElementById('edit-proc').value),
+            "Nº PROC": formatProcessoParaDB(document.getElementById('edit-proc').value),
             "assunto": document.getElementById('edit-assunto').value,
             "entrada": document.getElementById('edit-entrada').value,
             "funcionários": document.getElementById('edit-func').value,
@@ -484,7 +484,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
     const res = processosData.filter(p => {
         let match = false;
         const pCtm = (p.ctm || '').toString().toLowerCase();
-        const pProc = (p['Nº PROC.'] || '').toString().toLowerCase();
+        const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
 
         if(fCtm && pCtm.includes(fCtm)) match = true;
         if(fProc && pProc.includes(fProc)) match = true;
@@ -498,7 +498,7 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
 
     tbody.innerHTML = res.map(p => `<tr>
         <td>${p.ctm||''}</td>
-        <td>${formatProcessoParaTela(p['Nº PROC.']||'')}</td>
+        <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
         <td>${p.assunto||''}</td>
         <td>${p.entrada||''}</td>
         <td>${p['funcionários']||''}</td>
