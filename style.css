@@ -1478,9 +1478,12 @@ display: block;
 }
 
 .login-card {
-  background: rgba(255,255,255,0.55);  /* branco, 40% opacidade */
-  box-shadow: 0 4px 32px rgba(0,0,0,0.9);
-  /* pode mexer no border-radius, padding etc se quiser */
+  background: rgba(255, 255, 255, 0.6); /* branco, 40% opacidade */
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.9);
+  width: 100%;
+  max-width: 400px; /* Ajuste este valor para deixar o box mais largo ou estreito */
+  padding: var(--space-32); /* Aumenta o espaço interno para dar proporção */
+  border-radius: var(--radius-lg);
 }
 
 .login-title {
