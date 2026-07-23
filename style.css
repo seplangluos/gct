@@ -1473,13 +1473,12 @@ display: block;
   align-items: center;
   justify-content: center;
   background: url('bg.png') no-repeat center center;
-  background-size: cover;
+  background-size: contain; /* Mostra a imagem inteira, podendo sobrar pequenas tarjas nas laterais ou topo/fundo */
   position: relative;
-  /* Se quiser um overlay escurecido, adicione antes do .login-card um extra opcional */
 }
 
 .login-card {
-  background: rgba(255,255,255,0.4);  /* branco, 40% opacidade */
+  background: rgba(255,255,255,0.55);  /* branco, 40% opacidade */
   box-shadow: 0 4px 32px rgba(0,0,0,0.9);
   /* pode mexer no border-radius, padding etc se quiser */
 }
