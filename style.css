@@ -1473,7 +1473,7 @@ display: block;
   align-items: center;
   justify-content: center;
   background: url('bg.png') no-repeat center center;
-  background-size: contain; /* Mostra a imagem inteira, podendo sobrar pequenas tarjas nas laterais ou topo/fundo */
+  background-size: 100% 100%; /* Força a imagem a preencher exato o tamanho da tela sem cortar */
   position: relative;
 }
 
