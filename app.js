@@ -27,32 +27,50 @@ let processosData = [];
 let currentMode = ''; 
 let charts = [];
 
+// Variáveis para a tabela geral
 let currentPage = 1;
 const itemsPerPage = 50;
 let filteredList = []; 
-
 let currentSortColumn = null;
 let currentSortDirection = 'desc';
+
+// Variáveis exclusivas para a tabela de Consulta Pública
+let consultaSortColumn = 'entrada';
+let consultaSortDirection = 'desc';
+let consultaFilteredList = [];
 
 // =========================================================================
 // UTILITÁRIOS E MÁSCARAS
 // =========================================================================
-function formatProcessoParaDB(proc) { 
-    return proc ? proc.toString().replace(/\//g, '-') : ''; 
-}
+window.formatDateToBR = function(dateStr) { 
+    if(!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+};
 
-function formatProcessoParaTela(proc) { 
-    return proc ? proc.toString().replace(/-/g, '/') : ''; 
-}
+// Máscara Automática de Datas para inputs com a classe 'date-mask'
+document.addEventListener('input', function(e) {
+    if (e.target && e.target.classList.contains('date-mask')) {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 8) v = v.slice(0, 8);
+        if (v.length > 4) {
+            v = v.replace(/^(\d{2})(\d{2})(\d+)/, "$1/$2/$3");
+        } else if (v.length > 2) {
+            v = v.replace(/^(\d{2})(\d+)/, "$1/$2");
+        }
+        e.target.value = v;
+    }
+});
+
+function formatProcessoParaDB(proc) { return proc ? proc.toString().replace(/\//g, '-') : ''; }
+function formatProcessoParaTela(proc) { return proc ? proc.toString().replace(/-/g, '/') : ''; }
 
 function formatDateBR(dateStr) {
     if (!dateStr) return '';
     let limpo = dateStr.toString().replace(/-/g, '/');
     let parts = limpo.split('/');
     if (parts.length === 3) {
-        if (parts[0].length === 4) {
-            return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
-        }
+        if (parts[0].length === 4) return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
         return `${parts[0].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[2]}`;
     }
     return dateStr;
@@ -78,9 +96,7 @@ function calcularDias(dataEntradaStr) {
 function maskCTM(value) {
     if (!value) return '';
     let digits = value.toString().replace(/\D/g, '');
-    if (digits.length === 9) {
-        return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5)}`;
-    }
+    if (digits.length === 9) return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5)}`;
     return value;
 }
 
@@ -107,10 +123,7 @@ window.nav = function(screenId) {
 // =========================================================================
 // AUTENTICAÇÃO
 // =========================================================================
-const USER_MAPPING = {
-    "Cadastro": "seplan.cadastro@valadares.mg.gov.br",
-    "Admin": "admin@hotmail.com"
-};
+const USER_MAPPING = { "Cadastro": "seplan.cadastro@valadares.mg.gov.br", "Admin": "admin@hotmail.com" };
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -131,9 +144,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     } catch(err) {
         document.getElementById('login-error').innerText = "Erro ao logar. Verifique a senha.";
         document.getElementById('login-error').classList.remove('hidden');
-    } finally {
-        document.getElementById('login-btn').innerText = 'Entrar';
-    }
+    } finally { document.getElementById('login-btn').innerText = 'Entrar'; }
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); nav('login'); });
@@ -157,56 +168,25 @@ loadData();
 // CARREGAMENTO DE DADOS (REALTIME)
 // =========================================================================
 function loadData() {
-    onValue(ref(db, 'Assuntos'), snap => {
-        configData.Assuntos = snap.exists() ? snap.val() : [];
-        populateSelects();
-        renderConfigListsIfActive();
-    });
-
-    onValue(ref(db, 'Cadastradores'), snap => {
-        configData.Cadastradores = snap.exists() ? snap.val() : [];
-        populateSelects();
-        renderConfigListsIfActive();
-    });
-
-    onValue(ref(db, 'Status'), snap => {
-        if(snap.exists()) configData.Status = snap.val();
-        populateSelects();
-        renderConfigListsIfActive();
-    });
-
-    onValue(ref(db, 'Destinos'), snap => {
-        if(snap.exists()) configData.Destinos = snap.val();
-        populateSelects();
-        renderConfigListsIfActive();
-    });
-
+    onValue(ref(db, 'Assuntos'), snap => { configData.Assuntos = snap.exists() ? snap.val() : []; populateSelects(); renderConfigListsIfActive(); });
+    onValue(ref(db, 'Cadastradores'), snap => { configData.Cadastradores = snap.exists() ? snap.val() : []; populateSelects(); renderConfigListsIfActive(); });
+    onValue(ref(db, 'Status'), snap => { if(snap.exists()) configData.Status = snap.val(); populateSelects(); renderConfigListsIfActive(); });
+    onValue(ref(db, 'Destinos'), snap => { if(snap.exists()) configData.Destinos = snap.val(); populateSelects(); renderConfigListsIfActive(); });
+    
     onValue(ref(db, 'processos'), snap => {
         processosData = [];
         if(snap.exists()) {
             const data = snap.val();
-            Object.keys(data).forEach(key => {
-                if(data[key]) {
-                    processosData.push({ id: key, ...data[key] });
-                }
-            });
+            Object.keys(data).forEach(key => { if(data[key]) processosData.push({ id: key, ...data[key] }); });
         }
-        
         populateDateMaskFilter();
-
-        if(document.getElementById('tabela-geral-screen').classList.contains('active')) {
-            renderTabelaGeral(false); 
-        }
-        if(document.getElementById('estatisticas-screen').classList.contains('active')) {
-            renderStats();
-        }
+        if(document.getElementById('tabela-geral-screen').classList.contains('active')) renderTabelaGeral(false); 
+        if(document.getElementById('estatisticas-screen').classList.contains('active')) renderStats();
     });
 }
 
 function renderConfigListsIfActive() {
-    if(document.getElementById('configuracoes-screen').classList.contains('active')){
-        renderConfigLists();
-    }
+    if(document.getElementById('configuracoes-screen').classList.contains('active')) renderConfigLists();
 }
 
 function populateSelects() {
@@ -247,13 +227,10 @@ function populateDateMaskFilter() {
         if (p['Data Status']) {
             let dt = formatDateBR(p['Data Status']);
             let parts = dt.split('/');
-            if (parts.length === 3) {
-                mesesAnosSet.add(`${parts[1]}/${parts[2]}`);
-            }
+            if (parts.length === 3) mesesAnosSet.add(`${parts[1]}/${parts[2]}`);
         }
     });
     
-    // Organizado do mês/ano mais recente para o mais antigo (ex: 2026/07, 2026/06...)
     let options = Array.from(mesesAnosSet).sort((a, b) => {
         let [mA, yA] = a.split('/');
         let [mB, yB] = b.split('/');
@@ -297,9 +274,8 @@ window.removerConfigItem = async function(chave, index) {
     if(!confirm('Tem certeza que deseja remover este item?')) return;
     const novaLista = [...(configData[chave] || [])];
     novaLista.splice(index, 1);
-    try {
-        await set(ref(db, chave), novaLista); 
-    } catch(err) { alert("Erro ao remover: " + err.message); }
+    try { await set(ref(db, chave), novaLista); } 
+    catch(err) { alert("Erro ao remover: " + err.message); }
 }
 
 // =========================================================================
@@ -355,11 +331,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 // =========================================================================
 function setupTabelaGeral(modo) {
     currentMode = modo;
-    const titulos = { 
-        'edicao': 'Edição de Processos', 
-        'pesquisa': 'Pesquisar Processos', 
-        'base': 'Base de Dados Completa' 
-    };
+    const titulos = { 'edicao': 'Edição de Processos', 'pesquisa': 'Pesquisar Processos', 'base': 'Base de Dados Completa' };
     document.getElementById('titulo-tabela').innerText = titulos[modo];
     
     currentPage = 1; 
@@ -368,8 +340,7 @@ function setupTabelaGeral(modo) {
 
     document.getElementById('filtro-ctm').value = '';
     document.getElementById('filtro-proc').value = '';
-    document.getElementById('filtro-func').value = '';
-    document.getElementById('filtro-assunto').value = '';
+    
     document.getElementById('col-filter-assunto').value = '';
     document.getElementById('col-filter-func').value = '';
     document.getElementById('col-filter-status').value = '';
@@ -394,8 +365,6 @@ function renderTabelaGeral(resetPage = false) {
 
     const fCtm = normalizeCTM(document.getElementById('filtro-ctm').value);
     const fProc = formatProcessoParaDB(document.getElementById('filtro-proc').value).toLowerCase().trim();
-    const fFunc = document.getElementById('filtro-func').value;
-    const fAss = document.getElementById('filtro-assunto').value;
 
     const colAss = document.getElementById('col-filter-assunto').value;
     const colFunc = document.getElementById('col-filter-func').value;
@@ -403,7 +372,7 @@ function renderTabelaGeral(resetPage = false) {
     const colDest = document.getElementById('col-filter-destino').value;
     const colDataMask = document.getElementById('col-filter-datamask').value;
 
-    if (currentMode === 'pesquisa' && !fCtm && !fProc && !fFunc && !fAss && !colAss && !colFunc && !colStatus && !colDest && !colDataMask) {
+    if (currentMode === 'pesquisa' && !fCtm && !fProc && !colAss && !colFunc && !colStatus && !colDest && !colDataMask) {
         filteredList = [];
         renderPaginaAtual();
         return;
@@ -416,8 +385,6 @@ function renderTabelaGeral(resetPage = false) {
 
         if(fCtm && !pCtm.includes(fCtm)) match = false;
         if(fProc && !pProc.includes(fProc)) match = false;
-        if(fFunc && p['funcionários'] !== fFunc) match = false;
-        if(fAss && p.assunto !== fAss) match = false;
 
         if(colAss && p.assunto !== colAss) match = false;
         if(colFunc && p['funcionários'] !== colFunc) match = false;
@@ -517,7 +484,7 @@ function renderPaginaAtual() {
     }
 
     if (totalItems === 0 && currentMode === 'pesquisa') {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center">Preencha os filtros acima e clique em "Pesquisar/Filtrar" para exibir os resultados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center">Preencha os filtros e clique em "Pesquisar/Filtrar" para exibir os resultados.</td></tr>`;
         document.getElementById('page-info').innerText = `Página 1 de 1 (Total: 0 registros)`;
         return;
     }
@@ -598,15 +565,54 @@ window.abrirEdicao = function(id) {
             <div class="form-group"><label>CTM</label><input type="text" id="edit-ctm" class="form-control" value="${maskCTM(p.ctm)||''}"></div>
             <div class="form-group"><label>Nº Processo</label><input type="text" id="edit-proc" class="form-control" value="${formatProcessoParaTela(p['Nº PROC']||'')}"></div>
             <div class="form-group"><label>Assunto</label><select id="edit-assunto" class="form-control"><option value="">Selecione...</option>${selAssuntos}</select></div>
-            <div class="form-group"><label>Entrada</label><input type="text" id="edit-entrada" class="form-control" value="${formatDateBR(p.entrada)||''}"></div>
+            
+            <div class="form-group"><label>Entrada</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-entrada" class="form-control date-mask" value="${formatDateBR(p.entrada)||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-entrada').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+            
             <div class="form-group"><label>Funcionário</label><select id="edit-func" class="form-control"><option value="">Selecione...</option>${selFuncs}</select></div>
             <div class="form-group"><label>Status</label><select id="edit-status" class="form-control"><option value="">Selecione...</option>${selStatus}</select></div>
-            <div class="form-group"><label>Data Status</label><input type="text" id="edit-data-status" class="form-control" value="${formatDateBR(p['Data Status'])||''}"></div>
-            <div class="form-group"><label>Vistoria</label><input type="text" id="edit-vist" class="form-control" value="${formatDateBR(p['Vistoria'])||''}"></div>
-            <div class="form-group"><label>1ª Vist</label><input type="text" id="edit-v1" class="form-control" value="${formatDateBR(p['1ª VISITA'])||''}"></div>
-            <div class="form-group"><label>2ª Vist</label><input type="text" id="edit-v2" class="form-control" value="${formatDateBR(p['2ª VISITA'])||''}"></div>
-            <div class="form-group"><label>3ª Vist</label><input type="text" id="edit-v3" class="form-control" value="${formatDateBR(p['3ª VISITA'])||''}"></div>
-            <div class="form-group"><label>Data Saída</label><input type="text" id="edit-saida" class="form-control" value="${formatDateBR(p['saída'])||''}"></div>
+            
+            <div class="form-group"><label>Data Status</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-data-status" class="form-control date-mask" value="${formatDateBR(p['Data Status'])||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-data-status').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+            <div class="form-group"><label>Vistoria</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-vist" class="form-control date-mask" value="${formatDateBR(p['Vistoria'])||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-vist').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+            <div class="form-group"><label>1ª Vist</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-v1" class="form-control date-mask" value="${formatDateBR(p['1ª VISITA'])||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-v1').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+            <div class="form-group"><label>2ª Vist</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-v2" class="form-control date-mask" value="${formatDateBR(p['2ª VISITA'])||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-v2').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+            <div class="form-group"><label>3ª Vist</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-v3" class="form-control date-mask" value="${formatDateBR(p['3ª VISITA'])||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-v3').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+            <div class="form-group"><label>Data Saída</label>
+                <div class="flex gap-4">
+                    <input type="text" id="edit-saida" class="form-control date-mask" value="${formatDateBR(p['saída'])||''}" maxlength="10">
+                    <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('edit-saida').value = formatDateToBR(this.value)">
+                </div>
+            </div>
+
             <div class="form-group"><label>Destino</label><select id="edit-destino" class="form-control"><option value="">Selecione...</option>${selDestinos}</select></div>
         </div>
         <div class="form-group mt-8">
@@ -656,33 +662,108 @@ window.deletarProcesso = async function(id) {
 }
 
 // =========================================================================
-// CONSULTA PÚBLICA
+// CONSULTA PÚBLICA & EXPANDIR LINHAS & ORDENAÇÃO
 // =========================================================================
+window.toggleRowInfo = function(btn, id) {
+    const targetRow = document.getElementById('details-' + id);
+    if(targetRow.classList.contains('hidden')) {
+        targetRow.classList.remove('hidden');
+        btn.innerText = '-';
+    } else {
+        targetRow.classList.add('hidden');
+        btn.innerText = '+';
+    }
+}
+
+// Chama a lógica de ordenação da tabela de Consulta Pública
+window.ordenarConsulta = function(colName) {
+    if (consultaSortColumn === colName) {
+        consultaSortDirection = consultaSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        consultaSortColumn = colName;
+        consultaSortDirection = 'asc';
+    }
+    renderConsultaPublica();
+}
+
 document.getElementById('btn-consultar-publico').addEventListener('click', () => {
     const fCtm = normalizeCTM(document.getElementById('consulta-ctm').value);
     const fProc = formatProcessoParaDB(document.getElementById('consulta-processo').value).toLowerCase().trim();
-    const tbody = document.getElementById('tbody-consulta-publica');
+    const fFunc = document.getElementById('consulta-funcionario').value;
     
-    if(!fCtm && !fProc) { alert("Preencha CTM ou Processo para consultar."); return; }
+    if(!fCtm && !fProc && !fFunc) { alert("Preencha CTM, Processo ou selecione um Funcionário para consultar."); return; }
 
-    const res = processosData.filter(p => {
+    consultaFilteredList = processosData.filter(p => {
         let match = false;
         const pCtm = normalizeCTM(p.ctm);
         const pProc = (p['Nº PROC'] || '').toString().toLowerCase();
+        
         if(fCtm && pCtm.includes(fCtm)) match = true;
         if(fProc && pProc.includes(fProc)) match = true;
+        if(fFunc && p['funcionários'] === fFunc) match = true;
         return match;
     });
 
-    if(res.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center">Nenhum processo encontrado.</td></tr>`;
+    renderConsultaPublica();
+});
+
+// Extrai a renderização da tabela para ser reutilizada ao ordenar
+function renderConsultaPublica() {
+    const tbody = document.getElementById('tbody-consulta-publica');
+    const thead = document.getElementById('thead-consulta-publica');
+    
+    // Configura o thead da Consulta com as setas
+    const sortIndicator = (col) => consultaSortColumn === col ? (consultaSortDirection === 'asc' ? ' ▲' : ' ▼') : '';
+    
+    thead.innerHTML = `
+        <th style="width: 40px;">+</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('ctm')">CTM${sortIndicator('ctm')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('Nº PROC')">Nº Processo${sortIndicator('Nº PROC')}</th>
+        <th class="col-assunto" style="cursor:pointer" onclick="ordenarConsulta('assunto')">Assunto${sortIndicator('assunto')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('entrada')">Entrada${sortIndicator('entrada')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('funcionários')">Funcionário${sortIndicator('funcionários')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('status')">Status${sortIndicator('status')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('Data Status')">Data Status${sortIndicator('Data Status')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('dias status')">Dias Status${sortIndicator('dias status')}</th>
+        <th style="cursor:pointer" onclick="ordenarConsulta('destino')">Destino${sortIndicator('destino')}</th>
+        <th class="col-detalhes">Detalhes</th>
+    `;
+
+    if(consultaFilteredList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" class="text-center">Nenhum processo encontrado.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = res.map(p => {
+    // Aplica a ordenação na lista de Consulta Pública
+    if (consultaSortColumn) {
+        consultaFilteredList.sort((a, b) => {
+            let valA = a[consultaSortColumn] || '';
+            let valB = b[consultaSortColumn] || '';
+            
+            if (consultaSortColumn.includes('data') || consultaSortColumn === 'entrada' || consultaSortColumn === 'Vistoria' || consultaSortColumn === 'Data Status') {
+                valA = parseDateBR(valA) || new Date(0);
+                valB = parseDateBR(valB) || new Date(0);
+            } else if (consultaSortColumn === 'dias' || consultaSortColumn === 'dias status') {
+                valA = parseInt(valA) || 0;
+                valB = parseInt(valB) || 0;
+            } else {
+                valA = valA.toString().toLowerCase();
+                valB = valB.toString().toLowerCase();
+            }
+
+            if (valA < valB) return consultaSortDirection === 'asc' ? -1 : 1;
+            if (valA > valB) return consultaSortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    // Renderiza a tabela do corpo
+    tbody.innerHTML = consultaFilteredList.map(p => {
         let dias = calcularDias(p.entrada);
         let diasStatus = p['Data Status'] ? calcularDias(p['Data Status']) : 0;
-        return `<tr>
+        
+        let linhaPrincipal = `<tr>
+            <td><button class="btn btn--primary btn--sm" onclick="toggleRowInfo(this, '${p.id}')">+</button></td>
             <td>${maskCTM(p.ctm)||''}</td>
             <td>${formatProcessoParaTela(p['Nº PROC']||'')}</td>
             <td class="col-assunto">${p.assunto||''}</td>
@@ -694,13 +775,40 @@ document.getElementById('btn-consultar-publico').addEventListener('click', () =>
             <td>${p.destino||''}</td>
             <td class="col-detalhes"><div style="white-space:normal; word-wrap:break-word;">${p['OBS']||''}</div></td>
         </tr>`;
+
+        let linhaExpandida = `<tr class="details-row hidden" id="details-${p.id}">
+            <td colspan="11">
+                <div class="expanded-details">
+                    <h4>Informações Completas do Processo</h4>
+                    <div class="expanded-details-grid">
+                        <p><strong>CTM:</strong> ${maskCTM(p.ctm)||'--'}</p>
+                        <p><strong>Nº Processo:</strong> ${formatProcessoParaTela(p['Nº PROC'])||'--'}</p>
+                        <p><strong>Assunto:</strong> ${p.assunto||'--'}</p>
+                        <p><strong>Entrada:</strong> ${formatDateBR(p.entrada)||'--'} (${dias} dias)</p>
+                        <p><strong>Funcionário:</strong> ${p['funcionários']||'--'}</p>
+                        <p><strong>Status:</strong> ${p.status||'--'}</p>
+                        <p><strong>Data Status:</strong> ${formatDateBR(p['Data Status'])||'--'} (${diasStatus} dias)</p>
+                        <p><strong>Destino:</strong> ${p.destino||'--'}</p>
+                        <p><strong>Vistoria:</strong> ${formatDateBR(p['Vistoria'])||'--'}</p>
+                        <p><strong>1ª Vistoria:</strong> ${formatDateBR(p['1ª VISITA'])||'--'}</p>
+                        <p><strong>2ª Vistoria:</strong> ${formatDateBR(p['2ª VISITA'])||'--'}</p>
+                        <p><strong>3ª Vistoria:</strong> ${formatDateBR(p['3ª VISITA'])||'--'}</p>
+                        <p><strong>Saída:</strong> ${formatDateBR(p['saída'])||'--'}</p>
+                        <p style="grid-column: 1 / -1;"><strong>Observações:</strong> ${p['OBS']||'--'}</p>
+                    </div>
+                </div>
+            </td>
+        </tr>`;
+        
+        return linhaPrincipal + linhaExpandida;
     }).join('');
-});
+}
 
 // =========================================================================
 // ESTATÍSTICAS
 // =========================================================================
 document.getElementById('stat-funcionario').addEventListener('change', renderStats);
+document.getElementById('stat-assunto-filter').addEventListener('change', renderStats);
 
 function renderStats() {
     if(!document.getElementById('estatisticas-screen').classList.contains('active')) return;
@@ -739,9 +847,10 @@ function renderStats() {
     document.getElementById('st-concl').innerText = concluidos;
     document.getElementById('st-concl-mes').innerText = concluidosMes;
     
+    // --- LÓGICA ESTATÍSTICAS FUNCIONÁRIO ---
     const funcSel = document.getElementById('stat-funcionario').value;
-    const tbody = document.getElementById('tbody-stats-func');
-    tbody.innerHTML = '';
+    const tbodyFunc = document.getElementById('tbody-stats-func');
+    tbodyFunc.innerHTML = '';
     
     if(funcSel) {
         let assuntosMap = {};
@@ -796,14 +905,66 @@ function renderStats() {
             <td>${totais.setorMes}</td><td>-</td><td>${totais.setorAno}</td><td>-</td>
             <td>${totais.cTotal}</td><td>${totais.cMes}</td><td>${totais.cAno}</td>
         </tr>`;
-
-        html += `<tr style="background: var(--color-bg-3); color: var(--color-primary); font-weight: bold;">
-            <th>Assunto</th><th>QTD</th><th>Mensal</th><th>Anual</th><th>Total Setor Mês</th><th>% Mês</th><th>Total Setor Ano</th><th>% Ano</th><th>Concluídos</th><th>Concl. Mês</th><th>Concl. Ano</th>
-        </tr>`;
         
-        tbody.innerHTML = html;
+        tbodyFunc.innerHTML = html;
     } else {
-        tbody.innerHTML = `<tr><td colspan="11" class="text-center">Selecione um funcionário para ver as estatísticas.</td></tr>`;
+        tbodyFunc.innerHTML = `<tr><td colspan="11" class="text-center">Selecione um funcionário para ver as estatísticas.</td></tr>`;
+    }
+
+    // --- LÓGICA ESTATÍSTICAS ASSUNTO ---
+    const assuntoSel = document.getElementById('stat-assunto-filter').value;
+    const tbodyAssunto = document.getElementById('tbody-stats-assunto');
+    tbodyAssunto.innerHTML = '';
+
+    if (assuntoSel) {
+        let funcsMap = {};
+        configData.Cadastradores.forEach(f => funcsMap[f] = { qtd:0, mes:0, ano:0, cTotal:0, cMes:0, cAno:0 });
+
+        processosData.forEach(p => {
+            if(p.assunto === assuntoSel && funcsMap[p['funcionários']]) {
+                const d = parseDateBR(p.entrada);
+                let isMes = d && (d.getMonth() + 1) === currMonth && d.getFullYear() === currYear;
+                let isAno = d && d.getFullYear() === currYear;
+                let isConcl = (p.status === 'Concluído');
+
+                funcsMap[p['funcionários']].qtd++;
+                if (isMes) funcsMap[p['funcionários']].mes++;
+                if (isAno) funcsMap[p['funcionários']].ano++;
+                if (isConcl) funcsMap[p['funcionários']].cTotal++;
+                if (isConcl && isMes) funcsMap[p['funcionários']].cMes++;
+                if (isConcl && isAno) funcsMap[p['funcionários']].cAno++;
+            }
+        });
+
+        let htmlAssunto = '';
+        let totaisAss = { qtd:0, mes:0, ano:0, cTotal:0, cMes:0, cAno:0 };
+
+        Object.keys(funcsMap).forEach(f => {
+            if (funcsMap[f].qtd > 0) {
+                let v = funcsMap[f];
+                
+                totaisAss.qtd += v.qtd;
+                totaisAss.mes += v.mes;
+                totaisAss.ano += v.ano;
+                totaisAss.cTotal += v.cTotal;
+                totaisAss.cMes += v.cMes;
+                totaisAss.cAno += v.cAno;
+
+                htmlAssunto += `<tr>
+                    <td>${f}</td><td>${v.qtd}</td><td>${v.mes}</td><td>${v.ano}</td>
+                    <td>${v.cTotal}</td><td>${v.cMes}</td><td>${v.cAno}</td>
+                </tr>`;
+            }
+        });
+
+        htmlAssunto += `<tr style="font-weight: bold; background-color: var(--color-bg-2);">
+            <td>TOTAL DA EQUIPE</td><td>${totaisAss.qtd}</td><td>${totaisAss.mes}</td><td>${totaisAss.ano}</td>
+            <td>${totaisAss.cTotal}</td><td>${totaisAss.cMes}</td><td>${totaisAss.cAno}</td>
+        </tr>`;
+
+        tbodyAssunto.innerHTML = htmlAssunto;
+    } else {
+        tbodyAssunto.innerHTML = `<tr><td colspan="7" class="text-center">Selecione um assunto acima para visualizar os dados por funcionário.</td></tr>`;
     }
     
     renderCharts(currMonth, currYear);

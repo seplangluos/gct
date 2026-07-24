@@ -35,6 +35,8 @@
                     <div id="login-error" class="error-message hidden"></div>
                 </div>
             </div>
+            <!-- NOVA MARCA REGISTRADA ADICIONADA AQUI -->
+            <div class="watermark-credits">Wendel Mendes™</div>
         </div>
     </div>
 
@@ -47,16 +49,29 @@
                     <button class="btn btn--outline btn-voltar-login">Voltar ao Login</button>
                 </div>
                 <div class="card__body">
-                    <div class="flex gap-16 mb-8">
-                        <input type="text" id="consulta-ctm" class="form-control" placeholder="Buscar por CTM">
-                        <input type="text" id="consulta-processo" class="form-control" placeholder="Buscar por Nº Processo">
+                    <div class="flex gap-16 mb-8 flex-wrap">
+                        <input type="text" id="consulta-ctm" class="form-control" placeholder="Buscar por CTM" style="flex: 1; min-width: 200px;">
+                        <input type="text" id="consulta-processo" class="form-control" placeholder="Buscar por Nº Processo" style="flex: 1; min-width: 200px;">
+                        <select id="consulta-funcionario" class="form-control dyn-funcionarios" style="flex: 1; min-width: 200px;">
+                            <option value="">Buscar por Funcionário</option>
+                        </select>
                         <button id="btn-consultar-publico" class="btn btn--primary">Consultar</button>
                     </div>
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
-                                <tr>
-                                    <th>CTM</th><th>Nº Processo</th><th class="col-assunto">Assunto</th><th>Entrada</th><th>Funcionário</th><th>Status</th><th>Data Status</th><th>Dias Status</th><th>Destino</th><th class="col-detalhes">Detalhes</th>
+                                <tr id="thead-consulta-publica">
+                                    <th style="width: 40px;">+</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('ctm')">CTM</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('Nº PROC')">Nº Processo</th>
+                                    <th class="col-assunto" style="cursor:pointer" onclick="ordenarConsulta('assunto')">Assunto</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('entrada')">Entrada</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('funcionários')">Funcionário</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('status')">Status</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('Data Status')">Data Status</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('dias status')">Dias Status</th>
+                                    <th style="cursor:pointer" onclick="ordenarConsulta('destino')">Destino</th>
+                                    <th class="col-detalhes">Detalhes</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-consulta-publica"></tbody>
@@ -100,15 +115,50 @@
                         <div class="form-group"><label>CTM (9 dígitos)</label><input type="text" id="cad-ctm" class="form-control" maxlength="12"></div>
                         <div class="form-group"><label>Nº de Processo *</label><input type="text" id="cad-processo" class="form-control" required placeholder="00000/0000"></div>
                         <div class="form-group"><label>Assunto *</label><select id="cad-assunto" class="form-control dyn-assuntos" required></select></div>
-                        <div class="form-group"><label>Data de Entrada</label><input type="text" id="cad-entrada" class="form-control" placeholder="dd/mm/aaaa"></div>
+                        <div class="form-group"><label>Data de Entrada</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-entrada" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-entrada').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
                         <div class="form-group"><label>Funcionário</label><select id="cad-funcionario" class="form-control dyn-funcionarios"></select></div>
                         <div class="form-group"><label>Status</label><select id="cad-status" class="form-control dyn-status"></select></div>
-                        <div class="form-group"><label>Data Status</label><input type="text" id="cad-data-status" class="form-control" placeholder="dd/mm/aaaa"></div>
-                        <div class="form-group"><label>Vistoria</label><input type="text" id="cad-vistoria" class="form-control" placeholder="dd/mm/aaaa"></div>
-                        <div class="form-group"><label>1ª Vistoria</label><input type="text" id="cad-v1" class="form-control" placeholder="dd/mm/aaaa"></div>
-                        <div class="form-group"><label>2ª Vistoria</label><input type="text" id="cad-v2" class="form-control" placeholder="dd/mm/aaaa"></div>
-                        <div class="form-group"><label>3ª Vistoria</label><input type="text" id="cad-v3" class="form-control" placeholder="dd/mm/aaaa"></div>
-                        <div class="form-group"><label>Data Saída</label><input type="text" id="cad-saida" class="form-control" placeholder="dd/mm/aaaa"></div>
+                        <div class="form-group"><label>Data Status</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-data-status" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-data-status').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Vistoria</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-vistoria" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-vistoria').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
+                        <div class="form-group"><label>1ª Vistoria</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-v1" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-v1').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
+                        <div class="form-group"><label>2ª Vistoria</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-v2" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-v2').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
+                        <div class="form-group"><label>3ª Vistoria</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-v3" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-v3').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
+                        <div class="form-group"><label>Data Saída</label>
+                            <div class="flex gap-4">
+                                <input type="text" id="cad-saida" class="form-control date-mask" placeholder="dd/mm/aaaa" maxlength="10">
+                                <input type="date" class="form-control" style="width: 45px; padding: 0 4px;" onchange="document.getElementById('cad-saida').value = formatDateToBR(this.value)">
+                            </div>
+                        </div>
                         <div class="form-group"><label>Destino</label><select id="cad-destino" class="form-control dyn-destinos"></select></div>
                     </div>
                     <div class="form-group mt-8">
@@ -126,15 +176,15 @@
         <div class="screen-header"><div class="container-fluid flex justify-between items-center"><h2 id="titulo-tabela">Base de Dados</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
         <div class="container-fluid mt-8">
             <div class="card mb-8">
+                <!-- Filtros Principais Reduzidos -->
                 <div class="card__body flex gap-16 flex-wrap" id="filtros-container">
-                    <input type="text" id="filtro-ctm" class="form-control" placeholder="CTM">
-                    <input type="text" id="filtro-proc" class="form-control" placeholder="Nº Processo">
-                    <select id="filtro-func" class="form-control dyn-funcionarios"><option value="">Todos Funcionários</option></select>
-                    <select id="filtro-assunto" class="form-control dyn-assuntos"><option value="">Todos Assuntos</option></select>
-                    <button id="btn-filtrar-geral" class="btn btn--primary">Pesquisar/Filtrar</button>
+                    <input type="text" id="filtro-ctm" class="form-control" placeholder="CTM" style="max-width: 250px;">
+                    <input type="text" id="filtro-proc" class="form-control" placeholder="Nº Processo" style="max-width: 250px;">
+                    <button id="btn-filtrar-geral" class="btn btn--primary">Pesquisar</button>
                 </div>
             </div>
             <div class="card">
+                <!-- Filtros Inferiores (Colunas) -->
                 <div class="card__header flex gap-8 flex-wrap" style="background: var(--color-bg-1);">
                     <select id="col-filter-assunto" class="form-control dyn-assuntos" style="max-width: 200px;"><option value="">Filtrar Assunto...</option></select>
                     <select id="col-filter-func" class="form-control dyn-funcionarios" style="max-width: 200px;"><option value="">Filtrar Funcionário...</option></select>
@@ -163,18 +213,19 @@
 
     <!-- TELA DE ESTATÍSTICAS -->
     <div id="estatisticas-screen" class="screen">
-        <div class="screen-header"><div class="container flex justify-between items-center"><h2>Estatísticas</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
-        <div class="container mt-8">
+        <div class="screen-header"><div class="container-fluid flex justify-between items-center"><h2>Estatísticas</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
+        <div class="container-fluid mt-8">
             <div class="stats-summary-grid mb-8">
                 <div class="card stat-card"><div class="card__body text-center"><h3>Total Entradas</h3><p id="st-total" class="font-size-3xl">0</p></div></div>
                 <div class="card stat-card"><div class="card__body text-center"><h3>Mensais</h3><p id="st-mensal" class="font-size-3xl">0</p></div></div>
                 <div class="card stat-card"><div class="card__body text-center"><h3>Concluídos (Total)</h3><p id="st-concl" class="font-size-3xl">0</p></div></div>
                 <div class="card stat-card"><div class="card__body text-center"><h3>Concluídos (Mês)</h3><p id="st-concl-mes" class="font-size-3xl">0</p></div></div>
             </div>
+            
             <div class="card mb-8">
                 <div class="card__body">
                     <label>Selecione o Funcionário:</label>
-                    <select id="stat-funcionario" class="form-control dyn-funcionarios"></select>
+                    <select id="stat-funcionario" class="form-control dyn-funcionarios" style="max-width: 400px;"></select>
                     <div class="table-container mt-8">
                         <table class="data-table">
                             <thead><tr><th>Assunto</th><th>QTD</th><th>Mensal</th><th>Anual</th><th>Total Setor Mês</th><th>% Mês</th><th>Total Setor Ano</th><th>% Ano</th><th>Concluídos</th><th>Concl. Mês</th><th>Concl. Ano</th></tr></thead>
@@ -183,6 +234,20 @@
                     </div>
                 </div>
             </div>
+
+            <div class="card mb-8">
+                <div class="card__body">
+                    <label>Selecione o Assunto (Estatísticas por Funcionários):</label>
+                    <select id="stat-assunto-filter" class="form-control dyn-assuntos" style="max-width: 400px;"></select>
+                    <div class="table-container mt-8">
+                        <table class="data-table">
+                            <thead><tr><th>Funcionário</th><th>QTD Total</th><th>Mensal</th><th>Anual</th><th>Concluídos (Total)</th><th>Concl. (Mês)</th><th>Concl. (Ano)</th></tr></thead>
+                            <tbody id="tbody-stats-assunto"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div class="filters-row">
                 <div class="card"><div class="card__header"><h4>Top 6 Assuntos (Mês)</h4></div><div class="card__body"><canvas id="chart1"></canvas></div></div>
                 <div class="card"><div class="card__header"><h4>Top 6 Funcionários (Entradas Mês)</h4></div><div class="card__body"><canvas id="chart2"></canvas></div></div>
