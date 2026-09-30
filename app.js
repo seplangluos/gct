@@ -114,10 +114,18 @@ window.nav = function(screenId) {
         document.getElementById(screenId + '-screen').classList.add('active');
         if(screenId === 'configuracoes') renderConfigLists();
         if(screenId === 'estatisticas') renderStats();
+        if(screenId === 'dashboard') renderDashboardStats();
     } else {
         document.getElementById('tabela-geral-screen').classList.add('active');
         setupTabelaGeral(screenId);
     }
+
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+    const activeLink = document.querySelector(`.nav-link[data-target="${screenId}"]`);
+    if(activeLink) activeLink.classList.add('active');
+
+    const sidebar = document.getElementById('sidebar');
+    if(sidebar) sidebar.classList.remove('mobile-open');
 }
 
 // =========================================================================
@@ -147,7 +155,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     } finally { document.getElementById('login-btn').innerText = 'Entrar'; }
 });
 
-document.getElementById('btn-logout').addEventListener('click', () => { signOut(auth); nav('login'); });
+const btnLogout = document.getElementById('btn-logout');
+if(btnLogout) btnLogout.addEventListener('click', () => handleLogout());
 document.getElementById('btn-open-consulta').addEventListener('click', () => nav('consulta'));
 document.querySelectorAll('.btn-voltar-login').forEach(b => b.addEventListener('click', () => nav('login')));
 
@@ -157,10 +166,76 @@ onAuthStateChanged(auth, user => {
         for (const [key, value] of Object.entries(USER_MAPPING)) {
             if (value === user.email) { nomeUsuario = key; break; }
         }
-        document.getElementById('user-info').innerText = `Usuário: ${nomeUsuario}`; 
+        document.getElementById('user-info').innerText = `Usuário: ${nomeUsuario}`;
+        const sidebarUserName = document.getElementById('sidebar-user-name');
+        if(sidebarUserName) sidebarUserName.innerText = nomeUsuario;
+        const sidebar = document.getElementById('sidebar');
+        if(sidebar) sidebar.classList.remove('hidden');
+        document.body.classList.add('has-sidebar');
         nav('dashboard'); 
+    } else {
+        const sidebar = document.getElementById('sidebar');
+        if(sidebar) {
+            sidebar.classList.add('hidden');
+            sidebar.classList.remove('mobile-open');
+        }
+        document.body.classList.remove('has-sidebar');
     }
 });
+
+function handleLogout() {
+    signOut(auth).finally(() => {
+        const sidebar = document.getElementById('sidebar');
+        if(sidebar) {
+            sidebar.classList.add('hidden');
+            sidebar.classList.remove('mobile-open');
+        }
+        document.body.classList.remove('has-sidebar');
+        nav('login');
+    });
+}
+
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = link.getAttribute('data-target');
+        if(target) nav(target);
+    });
+});
+
+document.querySelectorAll('.mobile-menu-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const sidebar = document.getElementById('sidebar');
+        if(sidebar) sidebar.classList.add('mobile-open');
+    });
+});
+
+const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+if(closeSidebarBtn) closeSidebarBtn.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    if(sidebar) sidebar.classList.remove('mobile-open');
+});
+
+const sidebarLogoutBtn = document.getElementById('sidebar-logout-btn');
+if(sidebarLogoutBtn) sidebarLogoutBtn.addEventListener('click', handleLogout);
+
+function updateDashboardDateTime() {
+    const el = document.getElementById('dashboard-datetime');
+    if(!el) return;
+    const now = new Date();
+    el.innerText = now.toLocaleString('pt-BR', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+updateDashboardDateTime();
+setInterval(updateDashboardDateTime, 1000);
 
 loadData();
 
@@ -182,6 +257,7 @@ function loadData() {
         populateDateMaskFilter();
         if(document.getElementById('tabela-geral-screen').classList.contains('active')) renderTabelaGeral(false); 
         if(document.getElementById('estatisticas-screen').classList.contains('active')) renderStats();
+        renderDashboardStats();
     });
 }
 
@@ -802,6 +878,38 @@ function renderConsultaPublica() {
         
         return linhaPrincipal + linhaExpandida;
     }).join('');
+}
+
+// =========================================================================
+// RESUMO DO DASHBOARD
+// =========================================================================
+function renderDashboardStats() {
+    const totalEl = document.getElementById('dash-st-total');
+    const mensalEl = document.getElementById('dash-st-mensal');
+    const conclEl = document.getElementById('dash-st-concl');
+    const conclMesEl = document.getElementById('dash-st-concl-mes');
+    if(!totalEl || !mensalEl || !conclEl || !conclMesEl) return;
+
+    const now = new Date();
+    const currMonth = now.getMonth() + 1;
+    const currYear = now.getFullYear();
+    let mensais = 0;
+    let concluidos = 0;
+    let concluidosMes = 0;
+
+    processosData.forEach(p => {
+        const d = parseDateBR(p.entrada);
+        const isMes = d && (d.getMonth() + 1) === currMonth && d.getFullYear() === currYear;
+        const isConcl = p.status === 'Concluído';
+        if(isMes) mensais++;
+        if(isConcl) concluidos++;
+        if(isConcl && isMes) concluidosMes++;
+    });
+
+    totalEl.innerText = processosData.length;
+    mensalEl.innerText = mensais;
+    conclEl.innerText = concluidos;
+    conclMesEl.innerText = concluidosMes;
 }
 
 // =========================================================================

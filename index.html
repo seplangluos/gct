@@ -8,6 +8,29 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+
+    <!-- MENU LATERAL -->
+    <aside id="sidebar" class="sidebar hidden">
+        <div class="sidebar-header">
+            <h2>Cadastro</h2>
+            <button id="close-sidebar-btn" class="btn-icon" type="button">&times;</button>
+        </div>
+        <div class="sidebar-nav">
+            <a href="#" data-target="dashboard" class="nav-link active">🏠 Cadastro</a>
+            <a href="#" data-target="cadastro" class="nav-link">📝 Nova Entrada</a>
+            <a href="#" data-target="edicao" class="nav-link">✏️ Edição</a>
+            <a href="#" data-target="pesquisa" class="nav-link">🔍 Pesquisa</a>
+            <a href="#" data-target="base" class="nav-link">🗄️ Base de Dados</a>
+            <a href="#" data-target="estatisticas" class="nav-link">📈 Estatísticas</a>
+            <a href="#" data-target="configuracoes" class="nav-link">⚙️ Configurações</a>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <span id="sidebar-user-name">Usuário</span>
+            </div>
+            <button id="sidebar-logout-btn" class="btn btn--outline btn--full-width" type="button">Sair</button>
+        </div>
+    </aside>
     <!-- TELA DE LOGIN -->
     <div id="login-screen" class="screen active">
         <div class="login-container">
@@ -36,7 +59,7 @@
                 </div>
             </div>
             <!-- NOVA MARCA REGISTRADA ADICIONADA AQUI -->
-            <div class="watermark-credits">Wendel Mendes™</div>
+            <div class="watermark-credits">WM™</div>
         </div>
     </div>
 
@@ -86,11 +109,14 @@
     <div id="dashboard-screen" class="screen">
         <div class="screen-header">
             <div class="container flex justify-between items-center">
-                <h2>Dashboard</h2>
                 <div class="flex items-center gap-16">
-                    <span id="user-info"></span>
-                    <button id="btn-logout" class="btn btn--outline">Sair</button>
+                    <button class="mobile-menu-btn btn btn--outline" type="button">☰ Menu</button>
+                    <div>
+                        <h2>Cadastro</h2>
+                        <p id="dashboard-datetime" class="dashboard-datetime">Data e hora</p>
+                    </div>
                 </div>
+                <span id="user-info"></span>
             </div>
         </div>
         <div class="container">
@@ -102,12 +128,38 @@
                 <button class="btn btn--info btn--lg" onclick="nav('estatisticas')">Estatísticas</button>
                 <button class="btn btn--outline btn--lg" onclick="nav('configuracoes')">Configurações</button>
             </div>
+
+            <div class="dashboard-stats-card card mt-8">
+                <div class="card__header">
+                    <h3>Resumo do Cadastro</h3>
+                </div>
+                <div class="card__body">
+                    <div class="dashboard-stats-grid">
+                        <div class="dashboard-stat-item">
+                            <span class="dashboard-stat-label">Número de Entradas</span>
+                            <strong id="dash-st-total" class="dashboard-stat-value">0</strong>
+                        </div>
+                        <div class="dashboard-stat-item">
+                            <span class="dashboard-stat-label">Entradas Mensais</span>
+                            <strong id="dash-st-mensal" class="dashboard-stat-value">0</strong>
+                        </div>
+                        <div class="dashboard-stat-item">
+                            <span class="dashboard-stat-label">Concluídos</span>
+                            <strong id="dash-st-concl" class="dashboard-stat-value">0</strong>
+                        </div>
+                        <div class="dashboard-stat-item">
+                            <span class="dashboard-stat-label">Concluídos Mensais</span>
+                            <strong id="dash-st-concl-mes" class="dashboard-stat-value">0</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- TELA DE CADASTRO -->
     <div id="cadastro-screen" class="screen">
-        <div class="screen-header"><div class="container flex justify-between items-center"><h2>Nova Entrada</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
+        <div class="screen-header"><div class="container flex justify-between items-center"><div class="flex items-center gap-16"><button class="mobile-menu-btn btn btn--outline" type="button">☰ Menu</button><h2>Nova Entrada</h2></div><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
         <div class="container mt-8">
             <form id="form-cadastro" class="card form-container">
                 <div class="card__body">
@@ -173,7 +225,7 @@
 
     <!-- TELA DE TABELA GERAL (Base, Edição, Pesquisa) -->
     <div id="tabela-geral-screen" class="screen">
-        <div class="screen-header"><div class="container-fluid flex justify-between items-center"><h2 id="titulo-tabela">Base de Dados</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
+        <div class="screen-header"><div class="container-fluid flex justify-between items-center"><div class="flex items-center gap-16"><button class="mobile-menu-btn btn btn--outline" type="button">☰ Menu</button><h2 id="titulo-tabela">Base de Dados</h2></div><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
         <div class="container-fluid mt-8">
             <div class="card mb-8">
                 <!-- Filtros Principais Reduzidos -->
@@ -213,7 +265,7 @@
 
     <!-- TELA DE ESTATÍSTICAS -->
     <div id="estatisticas-screen" class="screen">
-        <div class="screen-header"><div class="container-fluid flex justify-between items-center"><h2>Estatísticas</h2><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
+        <div class="screen-header"><div class="container-fluid flex justify-between items-center"><div class="flex items-center gap-16"><button class="mobile-menu-btn btn btn--outline" type="button">☰ Menu</button><h2>Estatísticas</h2></div><button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button></div></div>
         <div class="container-fluid mt-8">
             <div class="stats-summary-grid mb-8">
                 <div class="card stat-card"><div class="card__body text-center"><h3>Total Entradas</h3><p id="st-total" class="font-size-3xl">0</p></div></div>
@@ -260,7 +312,10 @@
     <div id="configuracoes-screen" class="screen">
         <div class="screen-header">
             <div class="container flex justify-between items-center">
-                <h2>Configurações do Sistema</h2>
+                <div class="flex items-center gap-16">
+                    <button class="mobile-menu-btn btn btn--outline" type="button">☰ Menu</button>
+                    <h2>Configurações do Sistema</h2>
+                </div>
                 <button class="btn btn--outline" onclick="nav('dashboard')">Voltar</button>
             </div>
         </div>
